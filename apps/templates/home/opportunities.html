@@ -1,0 +1,30 @@
+{% extends "layouts/base.html" %}
+
+{% block content %}
+<div class="main-content">
+    <h2>Oportunidades</h2>
+    <button class="btn btn-primary mb-3">Adicionar Oportunidade</button>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Nome</th>
+                <th>Valor</th>
+                <th>Status</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Dados das oportunidades serão renderizados aqui -->
+            <tr>
+                <td>Venda de software</td>
+                <td>R$ 5.000,00</td>
+                <td>Aberta</td>
+                <td>
+                    <button class="btn btn-sm btn-info">Editar</button>
+                    <button class="btn btn-sm btn-danger">Excluir</button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% endblock %}

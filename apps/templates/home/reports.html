@@ -1,0 +1,141 @@
+{% extends "layouts/base.html" %}
+
+{% block content %}
+<div class="main-content">
+    <h2 class="mb-4">Relatórios</h2>
+    
+    <!-- Grid para os cards -->
+    <div class="row">
+        <!-- Primeiro card -->
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h3 class="card-title">Vendas Mensais</h3>
+                </div>
+                <div class="card-body">
+                    <canvas id="salesChart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Segundo card -->
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h3 class="card-title">Leads por Fonte</h3>
+                </div>
+                <div class="card-body">
+                    <canvas id="leadsChart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Terceiro card -->
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h3 class="card-title">Desempenho Anual</h3>
+                </div>
+                <div class="card-body">
+                    <canvas id="annualChart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Adicionar o Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // Gráfico de Barras - Vendas Mensais
+    var salesCtx = document.getElementById('salesChart').getContext('2d');
+    new Chart(salesCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
+            datasets: [{
+                label: 'Vendas (R$ mil)',
+                data: [12, 19, 15, 17, 22, 24],
+                backgroundColor: 'rgba(78, 115, 223, 0.5)',
+                borderColor: 'rgba(78, 115, 223, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // Gráfico de Pizza - Leads por Fonte
+    var leadsCtx = document.getElementById('leadsChart').getContext('2d');
+    new Chart(leadsCtx, {
+        type: 'pie',
+        data: {
+            labels: ['Website', 'Redes Sociais', 'Email', 'Indicações', 'Outros'],
+            datasets: [{
+                data: [35, 25, 20, 15, 5],
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.8)',
+                    'rgba(54, 162, 235, 0.8)',
+                    'rgba(255, 206, 86, 0.8)',
+                    'rgba(75, 192, 192, 0.8)',
+                    'rgba(153, 102, 255, 0.8)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
+    // Gráfico de Linha - Desempenho Anual
+    var annualCtx = document.getElementById('annualChart').getContext('2d');
+    new Chart(annualCtx, {
+        type: 'line',
+        data: {
+            labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
+            datasets: [{
+                label: '2024',
+                data: [65, 70, 80, 81, 90, 95],
+                borderColor: 'rgba(75, 192, 192, 1)',
+                tension: 0.3,
+                fill: false
+            },
+            {
+                label: '2023',
+                data: [60, 65, 70, 75, 80, 85],
+                borderColor: 'rgba(192, 75, 192, 1)',
+                tension: 0.3,
+                fill: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                y: {
+                    beginAtZero: false
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

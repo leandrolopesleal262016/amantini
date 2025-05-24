@@ -1,0 +1,82 @@
+<nav class="sidenav navbar navbar-vertical  fixed-left  navbar-expand-xs navbar-light bg-white" id="sidenav-main">
+  <div class="scrollbar-inner">
+    <!-- Brand -->
+    <div class="sidenav-header  align-items-center">
+      <a class="navbar-brand" href="/">        
+        <img src="/static/assets/img/brand/blocos.png" class="navbar-brand-img" alt="CRM Logo" style="transform: scale(3);">
+      </a>
+    </div>
+    <div class="navbar-inner">
+      <!-- Collapse -->
+      <div class="collapse navbar-collapse" id="sidenav-collapse-main">
+        <!-- Nav items -->
+        <ul class="navbar-nav">
+          <!-- Dashboard -->
+          <li class="nav-item">
+            <a class="nav-link {% if 'index' in segment %} active {% endif %}" href="/">
+              <i class="ni ni-tv-2 text-primary"></i>
+              <span class="nav-link-text">Dashboard</span>
+            </a>
+          </li>
+          <!-- Contatos -->
+          <!-- <li class="nav-item">
+            <a class="nav-link {% if 'contacts' in segment %} active {% endif %}" href="/contacts">
+              <i class="ni ni-single-02 text-yellow"></i>
+              <span class="nav-link-text">Contatos</span>
+            </a>
+          </li> -->
+          <!-- Tarefas -->
+          <li class="nav-item">
+            <a class="nav-link {% if 'tasks' in segment %} active {% endif %}" href="/tasks">
+              <i class="ni ni-bullet-list-67 text-default"></i>
+              <span class="nav-link-text">Tarefas</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if 'tasks' in segment %} active {% endif %}" href="/tables">
+              <i class="ni ni-bullet-list-67 text-info"></i>
+              <span class="nav-link-text">Controle de pedidos</span>
+            </a>
+          </li>
+          <!-- Oportunidades -->
+          <li class="nav-item">
+            <a class="nav-link {% if 'opportunities' in segment %} active {% endif %}" href="/opportunities">
+              <i class="ni ni-chart-bar-32 text-info"></i>
+              <span class="nav-link-text">Financeiro</span>
+            </a>
+          </li>
+          <!-- Orçamentaria -->
+          <li class="nav-item">
+            <a class="nav-link {% if 'reports' in segment %} active {% endif %}" href="/reports">
+              <i class="ni ni-paper-diploma text-primary"></i>
+              <span class="nav-link-text">Orçamentaria</span>
+            </a>
+          </li>
+          <!-- Relatórios
+          <li class="nav-item">
+            <a class="nav-link {% if 'reports' in segment %} active {% endif %}" href="/reports">
+              <i class="ni ni-chart-pie-35 text-orange"></i>
+              <span class="nav-link-text">Relatórios</span>
+            </a>
+          </li> -->
+          
+        </ul>
+        <!-- Divider -->
+        <hr class="my-3">
+        <!-- Heading -->
+        <h6 class="navbar-heading p-0 text-muted">
+          <span class="docs-normal">Recursos</span>
+        </h6>
+        <!-- Navigation -->
+        <ul class="navbar-nav mb-md-3">
+          <li class="nav-item">
+            <a class="nav-link" target="_blank" href="">
+              <i class="ni ni-archive-2"></i>
+              <span class="nav-link-text">Página do Produtos</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</nav>
