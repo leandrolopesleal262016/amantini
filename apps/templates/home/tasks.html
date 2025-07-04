@@ -53,6 +53,56 @@
     .task-list.sortable-drag {
         background-color: transparent;
     }
+
+    /* Estilo para tornar o card clicável */
+    .task-card .card-body {
+        cursor: pointer;
+    }
+
+    .task-card .card-body:hover {
+        background-color: rgba(0,0,0,0.02);
+    }
+
+    /* Estilo para o modal de detalhes */
+    .task-detail-modal .modal-body {
+        padding: 1.5rem;
+    }
+
+    .task-detail-field {
+        margin-bottom: 1rem;
+    }
+
+    .task-detail-label {
+        font-weight: 600;
+        color: #32325d;
+        font-size: 0.875rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .task-detail-value {
+        color: #525f7f;
+        font-size: 0.875rem;
+    }
+
+    .task-status-badge {
+        display: inline-block;
+        padding: 0.375rem 0.75rem;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .task-priority-high { background-color: #f5365c; color: white; }
+    .task-priority-medium { background-color: #11cdef; color: white; }
+    .task-priority-low { background-color: #2dce89; color: white; }
+
+    .task-description {
+        background-color: #f8f9fa;
+        padding: 1rem;
+        border-radius: 0.375rem;
+        border-left: 4px solid #5e72e4;
+        margin-top: 0.5rem;
+    }
 </style>
 {% endblock %}
 
@@ -81,7 +131,16 @@
                     </div>
                     <div class="card-body p-2">
                         <div class="task-list" id="pending">
-                            <div class="card task-card" data-id="1">
+                            <div class="card task-card" data-id="1" 
+                                 data-title="Revisar contrato"
+                                 data-priority="Alta"
+                                 data-description="Revisar o contrato do cliente X com atenção especial às cláusulas de pagamento e prazo de entrega. Verificar se todos os termos estão de acordo com nossa política comercial."
+                                 data-deadline="25/01/2025"
+                                 data-assignee="João Silva"
+                                 data-status="Pendente"
+                                 data-created="20/01/2025"
+                                 data-estimatedtime="4 horas"
+                                 onclick="openTaskDetail(this)">
                                 <div class="card-body p-3">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <h5 class="mb-2">Revisar contrato</h5>
@@ -92,7 +151,7 @@
                                         <small class="text-muted">Vence em: 25/01/2025</small>
                                         <div class="avatar-group">
                                             <a href="#" class="avatar avatar-sm rounded-circle">
-                                                <img alt="Image placeholder" src="/static/assets/img/theme/team-1.jpg">
+                                                <img alt="João Silva" src="/static/assets/img/theme/team-1.jpg">
                                             </a>
                                         </div>
                                     </div>
@@ -111,7 +170,16 @@
                     </div>
                     <div class="card-body p-2">
                         <div class="task-list" id="progress">
-                            <div class="card task-card" data-id="2">
+                            <div class="card task-card" data-id="2"
+                                 data-title="Reunião com cliente"
+                                 data-priority="Média"
+                                 data-description="Apresentar proposta comercial para o cliente ABC. Incluir demonstração do produto, análise de ROI e cronograma de implementação."
+                                 data-deadline="26/01/2025"
+                                 data-assignee="Maria Santos"
+                                 data-status="Em Progresso"
+                                 data-created="22/01/2025"
+                                 data-estimatedtime="2 horas"
+                                 onclick="openTaskDetail(this)">
                                 <div class="card-body p-3">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <h5 class="mb-2">Reunião com cliente</h5>
@@ -122,7 +190,7 @@
                                         <small class="text-muted">Vence em: 26/01/2025</small>
                                         <div class="avatar-group">
                                             <a href="#" class="avatar avatar-sm rounded-circle">
-                                                <img alt="Image placeholder" src="/static/assets/img/theme/team-2.jpg">
+                                                <img alt="Maria Santos" src="/static/assets/img/theme/team-2.jpg">
                                             </a>
                                         </div>
                                     </div>
@@ -141,7 +209,16 @@
                     </div>
                     <div class="card-body p-2">
                         <div class="task-list" id="completed">
-                            <div class="card task-card" data-id="3">
+                            <div class="card task-card" data-id="3"
+                                 data-title="Enviar proposta"
+                                 data-priority="Baixa"
+                                 data-description="Enviar proposta atualizada para o cliente após revisão da equipe técnica. Incluir todos os anexos e documentação necessária."
+                                 data-deadline="20/01/2025"
+                                 data-assignee="Pedro Costa"
+                                 data-status="Concluído"
+                                 data-created="18/01/2025"
+                                 data-estimatedtime="1 hora"
+                                 onclick="openTaskDetail(this)">
                                 <div class="card-body p-3">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <h5 class="mb-2">Enviar proposta</h5>
@@ -152,7 +229,7 @@
                                         <small class="text-muted">Concluído: 20/01/2025</small>
                                         <div class="avatar-group">
                                             <a href="#" class="avatar avatar-sm rounded-circle">
-                                                <img alt="Image placeholder" src="/static/assets/img/theme/team-3.jpg">
+                                                <img alt="Pedro Costa" src="/static/assets/img/theme/team-3.jpg">
                                             </a>
                                         </div>
                                     </div>
@@ -165,14 +242,205 @@
         </div>
     </div>
 
-    <!-- Modal Nova Tarefa -->
-    <!-- Mantido o mesmo modal -->
+    <!-- Modal de Detalhes da Tarefa -->
+    <div class="modal fade task-detail-modal" id="taskDetailModal" tabindex="-1" role="dialog" aria-labelledby="taskDetailModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="taskDetailModalLabel">Detalhes da Tarefa</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="task-detail-field">
+                                <div class="task-detail-label">Título</div>
+                                <h4 id="detail-title" class="task-detail-value"></h4>
+                            </div>
+
+                            <div class="task-detail-field">
+                                <div class="task-detail-label">Descrição</div>
+                                <div class="task-description">
+                                    <div id="detail-description" class="task-detail-value"></div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="task-detail-field">
+                                        <div class="task-detail-label">Data de Criação</div>
+                                        <div id="detail-created" class="task-detail-value"></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="task-detail-field">
+                                        <div class="task-detail-label">Prazo</div>
+                                        <div id="detail-deadline" class="task-detail-value"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="task-detail-field">
+                                <div class="task-detail-label">Tempo Estimado</div>
+                                <div id="detail-estimatedtime" class="task-detail-value"></div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="task-detail-field">
+                                <div class="task-detail-label">Status</div>
+                                <span id="detail-status" class="task-status-badge"></span>
+                            </div>
+
+                            <div class="task-detail-field">
+                                <div class="task-detail-label">Prioridade</div>
+                                <span id="detail-priority" class="task-status-badge"></span>
+                            </div>
+
+                            <div class="task-detail-field">
+                                <div class="task-detail-label">Responsável</div>
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar avatar-sm rounded-circle me-2">
+                                        <img id="detail-assignee-avatar" alt="" src="/static/assets/img/theme/team-1.jpg">
+                                    </div>
+                                    <div id="detail-assignee" class="task-detail-value ms-2"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
+                    <button type="button" class="btn btn-primary">Editar Tarefa</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Nova Tarefa (mantido o mesmo modal existente) -->
+    <div class="modal fade" id="newTaskModal" tabindex="-1" role="dialog" aria-labelledby="newTaskModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="newTaskModalLabel">Nova Tarefa</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="form-group">
+                            <label for="taskTitle">Título</label>
+                            <input type="text" class="form-control" id="taskTitle" placeholder="Digite o título da tarefa">
+                        </div>
+                        <div class="form-group">
+                            <label for="taskDescription">Descrição</label>
+                            <textarea class="form-control" id="taskDescription" rows="3" placeholder="Digite a descrição da tarefa"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="taskPriority">Prioridade</label>
+                            <select class="form-control" id="taskPriority">
+                                <option value="Baixa">Baixa</option>
+                                <option value="Média">Média</option>
+                                <option value="Alta">Alta</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="taskDeadline">Prazo</label>
+                            <input type="date" class="form-control" id="taskDeadline">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary">Criar Tarefa</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Adicionar Sortable.js -->
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
 <script>
+    // Função para abrir o modal de detalhes da tarefa
+    function openTaskDetail(cardElement) {
+        // Extrair dados do card
+        const title = cardElement.getAttribute('data-title');
+        const priority = cardElement.getAttribute('data-priority');
+        const description = cardElement.getAttribute('data-description');
+        const deadline = cardElement.getAttribute('data-deadline');
+        const assignee = cardElement.getAttribute('data-assignee');
+        const status = cardElement.getAttribute('data-status');
+        const created = cardElement.getAttribute('data-created');
+        const estimatedTime = cardElement.getAttribute('data-estimatedtime');
+
+        // Preencher o modal com os dados
+        document.getElementById('detail-title').textContent = title;
+        document.getElementById('detail-description').textContent = description;
+        document.getElementById('detail-deadline').textContent = deadline;
+        document.getElementById('detail-assignee').textContent = assignee;
+        document.getElementById('detail-created').textContent = created;
+        document.getElementById('detail-estimatedtime').textContent = estimatedTime;
+
+        // Definir status com estilo
+        const statusElement = document.getElementById('detail-status');
+        statusElement.textContent = status;
+        statusElement.className = 'task-status-badge';
+        
+        switch(status) {
+            case 'Pendente':
+                statusElement.classList.add('task-priority-medium');
+                statusElement.style.backgroundColor = '#fb6340';
+                break;
+            case 'Em Progresso':
+                statusElement.classList.add('task-priority-medium');
+                statusElement.style.backgroundColor = '#11cdef';
+                break;
+            case 'Concluído':
+                statusElement.classList.add('task-priority-low');
+                statusElement.style.backgroundColor = '#2dce89';
+                break;
+        }
+
+        // Definir prioridade com estilo
+        const priorityElement = document.getElementById('detail-priority');
+        priorityElement.textContent = priority;
+        priorityElement.className = 'task-status-badge';
+        
+        switch(priority) {
+            case 'Alta':
+                priorityElement.classList.add('task-priority-high');
+                break;
+            case 'Média':
+                priorityElement.classList.add('task-priority-medium');
+                break;
+            case 'Baixa':
+                priorityElement.classList.add('task-priority-low');
+                break;
+        }
+
+        // Definir avatar do responsável
+        const avatarElement = document.getElementById('detail-assignee-avatar');
+        switch(assignee) {
+            case 'João Silva':
+                avatarElement.src = '/static/assets/img/theme/team-1.jpg';
+                break;
+            case 'Maria Santos':
+                avatarElement.src = '/static/assets/img/theme/team-2.jpg';
+                break;
+            case 'Pedro Costa':
+                avatarElement.src = '/static/assets/img/theme/team-3.jpg';
+                break;
+        }
+
+        // Abrir o modal
+        $('#taskDetailModal').modal('show');
+    }
+
     // Inicializar Sortable em cada lista de tarefas
     document.addEventListener('DOMContentLoaded', function() {
         const containers = document.querySelectorAll('.task-list');
@@ -208,6 +476,21 @@
                         
                         // Atualizar visualmente o card
                         updateCardStyle(evt.item, newStatus);
+                        
+                        // Atualizar o data-status do card
+                        let newStatusText = '';
+                        switch(newStatus) {
+                            case 'pending':
+                                newStatusText = 'Pendente';
+                                break;
+                            case 'progress':
+                                newStatusText = 'Em Progresso';
+                                break;
+                            case 'completed':
+                                newStatusText = 'Concluído';
+                                break;
+                        }
+                        evt.item.setAttribute('data-status', newStatusText);
                     }
                 }
             });
@@ -233,6 +516,5 @@
         }
     });
 </script>
- 
-</script>
+
 {% endblock %}
