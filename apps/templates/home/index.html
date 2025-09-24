@@ -1,0 +1,52 @@
+{% extends "layouts/base.html" %}
+
+{% block sidebar %}
+<div class="sidebar">
+    <div class="sidebar-wrapper">
+        <ul class="nav">
+            <!-- Dashboard -->
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('index') }}">
+                    <i class="ni ni-tv-2"></i>
+                    <span>Dashboard</span>
+                </a>
+            </li>
+            <!-- Contatos -->
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('contacts') }}">
+                    <i class="ni ni-single-02"></i>
+                    <span>Contatos</span>
+                </a>
+            </li>
+            <!-- Tarefas -->
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('tasks') }}">
+                    <i class="ni ni-bullet-list-67"></i>
+                    <span>Tarefas</span>
+                </a>
+            </li>
+            <!-- Oportunidades -->
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('opportunities') }}">
+                    <i class="ni ni-chart-bar-32"></i>
+                    <span>Oportunidades</span>
+                </a>
+            </li>
+            <!-- Relatórios -->
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('reports') }}">
+                    <i class="ni ni-chart-pie-35"></i>
+                    <span>Relatórios</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="main-content">
+    <h2>Bem-vindo ao CRM</h2>
+    <p>Utilize o menu lateral para navegar entre as funcionalidades do sistema.</p>
+</div>
+{% endblock %}

@@ -1,0 +1,145 @@
+{% extends "layouts/base.html" %}
+
+{% block content %}
+<div class="main-content">
+    <h2>Contatos</h2>
+
+    <!-- Botão para abrir o modal de adicionar contato -->
+    <button type="button" class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#addContactModal">
+        Adicionar Contato
+    </button>
+
+    <!-- Adicione isso logo após o botão "Adicionar Contato" -->
+    <div class="mb-3">
+        <form method="GET" action="/contacts" class="d-flex">
+            <input type="text" name="search" class="form-control me-2" placeholder="Pesquisar contatos..." value="{{ request.args.get('search', '') }}">
+            <button type="submit" class="btn btn-outline-primary">Buscar</button>
+        </form>
+    </div>
+
+    <!-- Modal para adicionar novo contato -->
+    <div class="modal fade" id="addContactModal" tabindex="-1" aria-labelledby="addContactModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addContactModalLabel">Adicionar Contato</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="POST" action="/contacts">
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="name">Nome</label>
+                            <input type="text" class="form-control" id="name" name="name" placeholder="Digite o nome" required>
+                        </div>
+                        <div class="form-group mt-3">
+                            <label for="email">Email</label>
+                            <input type="email" class="form-control" id="email" name="email" placeholder="Digite o email" required>
+                        </div>
+                        <div class="form-group mt-3">
+                            <label for="phone">Telefone</label>
+                            <input type="text" class="form-control" id="phone" name="phone" placeholder="Digite o telefone" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Salvar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal de Alerta para Confirmação de Exclusão -->
+    <div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmDeleteModalLabel">Confirmar Exclusão</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Tem certeza que deseja excluir permanentemente este cliente?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <a href="#" id="deleteConfirmButton" class="btn btn-danger">Excluir</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de contatos -->
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Nome</th>
+                <th>Email</th>
+                <th>Telefone</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for contact in contacts %}
+            <tr>
+                <td>{{ contact.name }}</td>
+                <td>{{ contact.email }}</td>
+                <td>{{ contact.phone }}</td>
+                <td>
+                    <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editContactModal{{ contact.id }}">
+                        Editar
+                    </button>
+                    <a href="#" 
+                    class="btn btn-sm btn-danger" 
+                    data-bs-toggle="modal" 
+                    data-bs-target="#confirmDeleteModal" 
+                    onclick="setDeleteUrl('/contacts/delete/{{ contact.id }}');">
+                    Excluir
+                    </a>
+
+
+                </td>
+            </tr>
+
+            <!-- Modal para editar contato -->
+            <div class="modal fade" id="editContactModal{{ contact.id }}" tabindex="-1" aria-labelledby="editContactModalLabel{{ contact.id }}" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="editContactModalLabel{{ contact.id }}">Editar Contato</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <form method="POST" action="/contacts/edit/{{ contact.id }}">
+                            <div class="modal-body">
+                                <div class="form-group">
+                                    <label for="name">Nome</label>
+                                    <input type="text" class="form-control" id="name" name="name" value="{{ contact.name }}" required>
+                                </div>
+                                <div class="form-group mt-3">
+                                    <label for="email">Email</label>
+                                    <input type="email" class="form-control" id="email" name="email" value="{{ contact.email }}" required>
+                                </div>
+                                <div class="form-group mt-3">
+                                    <label for="phone">Telefone</label>
+                                    <input type="text" class="form-control" id="phone" name="phone" value="{{ contact.phone }}" required>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<script>
+    function setDeleteUrl(url) {
+        const deleteButton = document.getElementById('deleteConfirmButton');
+        deleteButton.setAttribute('href', url);
+    }
+</script>
+
+{% endblock %}

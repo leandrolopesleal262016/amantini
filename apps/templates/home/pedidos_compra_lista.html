@@ -1,0 +1,290 @@
+<!-- Salve como: apps/templates/home/pedidos_compra_lista.html -->
+
+{% extends "layouts/base.html" %}
+
+{% block title %} Pedidos de Compra {% endblock %}
+
+{% block stylesheets %}
+<style>
+    .header.bg-gradient-primary {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+    }
+    .status-badge {
+        padding: 0.375rem 0.75rem;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .status-solicitado { background-color: #ffeaa7; color: #2d3436; }
+    .status-aprovado { background-color: #74b9ff; color: white; }
+    .status-em_compra { background-color: #fd79a8; color: white; }
+    .status-entregue { background-color: #00b894; color: white; }
+    
+    .priority-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    
+    .priority-baixa { background-color: #d4edda; color: #155724; }
+    .priority-media { background-color: #fff3cd; color: #856404; }
+    .priority-alta { background-color: #f8d7da; color: #721c24; }
+    .priority-urgente { background-color: #dc3545; color: white; }
+    
+    .card-hover:hover {
+        transform: translateY(-5px);
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 25px rgba(0,0,0,0.15);
+    }
+    
+    .stats-card {
+        border-radius: 15px;
+        border: none;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
+    .quick-actions {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 1000;
+    }
+    
+    @media (max-width: 768px) {
+        .quick-actions {
+            bottom: 15px;
+            right: 15px;
+        }
+    }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+<div class="header bg-gradient-primary pb-8 pt-5 pt-md-8">
+    <div class="container-fluid">
+        <div class="header-body">
+            <!-- Header stats -->
+            <div class="row">
+                <div class="col-xl-3 col-lg-6">
+                    <div class="card card-stats mb-4 mb-xl-0">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col">
+                                    <h5 class="card-title text-uppercase text-muted mb-0">Total de Pedidos</h5>
+                                    <span class="h2 font-weight-bold mb-0">{{ pedidos|length }}</span>
+                                </div>
+                                <div class="col-auto">
+                                    <div class="icon icon-shape bg-danger text-white rounded-circle shadow">
+                                        <i class="fas fa-shopping-cart"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-3 col-lg-6">
+                    <div class="card card-stats mb-4 mb-xl-0">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col">
+                                    <h5 class="card-title text-uppercase text-muted mb-0">Pendentes</h5>
+                                    <span class="h2 font-weight-bold mb-0">
+                                        {{ pedidos|selectattr("status", "equalto", "solicitado")|list|length }}
+                                    </span>
+                                </div>
+                                <div class="col-auto">
+                                    <div class="icon icon-shape bg-warning text-white rounded-circle shadow">
+                                        <i class="fas fa-clock"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-3 col-lg-6">
+                    <div class="card card-stats mb-4 mb-xl-0">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col">
+                                    <h5 class="card-title text-uppercase text-muted mb-0">Em Compra</h5>
+                                    <span class="h2 font-weight-bold mb-0">
+                                        {{ pedidos|selectattr("status", "equalto", "em_compra")|list|length }}
+                                    </span>
+                                </div>
+                                <div class="col-auto">
+                                    <div class="icon icon-shape bg-info text-white rounded-circle shadow">
+                                        <i class="fas fa-shopping-bag"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-3 col-lg-6">
+                    <div class="card card-stats mb-4 mb-xl-0">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col">
+                                    <h5 class="card-title text-uppercase text-muted mb-0">Entregues</h5>
+                                    <span class="h2 font-weight-bold mb-0">
+                                        {{ pedidos|selectattr("status", "equalto", "entregue")|list|length }}
+                                    </span>
+                                </div>
+                                <div class="col-auto">
+                                    <div class="icon icon-shape bg-success text-white rounded-circle shadow">
+                                        <i class="fas fa-check"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row align-items-center py-4">
+                <div class="col-lg-6 col-7">
+                    <h6 class="h2 text-white d-inline-block mb-0">Pedidos de Compra</h6>
+                    <nav aria-label="breadcrumb" class="d-none d-md-inline-block ml-md-4">
+                        <ol class="breadcrumb breadcrumb-links breadcrumb-dark">
+                            <li class="breadcrumb-item"><a href="{{ url_for('home_blueprint.index') }}"><i class="fas fa-home"></i></a></li>
+                            <li class="breadcrumb-item active" aria-current="page">Pedidos de Compra</li>
+                        </ol>
+                    </nav>
+                </div>
+                <div class="col-lg-6 col-5 text-right">
+                    <a href="{{ url_for('home_blueprint.novo_pedido_compra') }}" class="btn btn-sm btn-neutral">
+                        <i class="fas fa-plus"></i> Novo Pedido
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid mt--7">
+    <div class="row">
+        <div class="col">
+            {% if pedidos %}
+            <div class="row">
+                {% for pedido in pedidos %}
+                <div class="col-xl-4 col-lg-6 col-md-6 col-sm-12 mb-4">
+                    <div class="card card-hover h-100">
+                        <div class="card-header border-0 pb-0">
+                            <div class="row align-items-center">
+                                <div class="col">
+                                    <h6 class="text-uppercase text-light ls-1 mb-1">Pedido #{{ pedido.id }}</h6>
+                                    <h2 class="mb-0">Obra {{ pedido.obra }}</h2>
+                                </div>
+                                <div class="col-auto">
+                                    <span class="status-badge status-{{ pedido.status }}">
+                                        {{ pedido.status|replace('_', ' ')|title }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body pt-0">
+                            <div class="row">
+                                <div class="col">
+                                    <div class="mb-2">
+                                        <span class="text-sm font-weight-bold">Responsável:</span>
+                                        <span class="text-sm">{{ pedido.responsavel }}</span>
+                                    </div>
+                                    <div class="mb-2">
+                                        <span class="text-sm font-weight-bold">Prioridade:</span>
+                                        <span class="priority-badge priority-{{ pedido.prioridade }}">
+                                            {{ pedido.prioridade|title }}
+                                        </span>
+                                    </div>
+                                    <div class="mb-2">
+                                        <span class="text-sm font-weight-bold">Data Necessidade:</span>
+                                        <span class="text-sm">{{ pedido.data_necessidade.strftime('%d/%m/%Y') }}</span>
+                                    </div>
+                                    <div class="mb-2">
+                                        <span class="text-sm font-weight-bold">Itens:</span>
+                                        <span class="badge badge-pill badge-primary">{{ pedido.itens|length }} item(s)</span>
+                                    </div>
+                                    <div class="mb-2">
+                                        <span class="text-sm font-weight-bold">Criado:</span>
+                                        <span class="text-sm">{{ pedido.data_criacao.strftime('%d/%m/%Y às %H:%M') }}</span>
+                                    </div>
+                                    
+                                    {% if pedido.observacoes %}
+                                    <div class="mb-2">
+                                        <span class="text-sm font-weight-bold">Obs:</span>
+                                        <span class="text-sm">{{ pedido.observacoes[:50] }}{% if pedido.observacoes|length > 50 %}...{% endif %}</span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-transparent">
+                            <div class="row align-items-center">
+                                <div class="col">
+                                    <a href="{{ url_for('home_blueprint.ver_pedido_compra', pedido_id=pedido.id) }}" 
+                                       class="btn btn-primary btn-sm">
+                                        <i class="fas fa-eye"></i> Ver Detalhes
+                                    </a>
+                                    {% if pedido.status == 'solicitado' %}
+                                    <a href="{{ url_for('home_blueprint.editar_pedido_compra', pedido_id=pedido.id) }}" 
+                                       class="btn btn-warning btn-sm">
+                                        <i class="fas fa-edit"></i> Editar
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="card shadow">
+                <div class="card-body text-center py-5">
+                    <div class="mb-4">
+                        <i class="fas fa-shopping-cart fa-4x text-muted"></i>
+                    </div>
+                    <h3 class="text-muted">Nenhum pedido encontrado</h3>
+                    <p class="text-muted mb-4">Comece criando seu primeiro pedido de compra.</p>
+                    <a href="{{ url_for('home_blueprint.novo_pedido_compra') }}" class="btn btn-primary">
+                        <i class="fas fa-plus mr-2"></i>Criar Primeiro Pedido
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Botão flutuante de ação rápida -->
+<div class="quick-actions">
+    <a href="{{ url_for('home_blueprint.novo_pedido_compra') }}" 
+       class="btn btn-primary btn-lg rounded-circle shadow-lg" 
+       title="Novo Pedido de Compra">
+        <i class="fas fa-plus fa-lg"></i>
+    </a>
+</div>
+{% endblock content %}
+
+{% block javascripts %}
+<script>
+    // Adicionar animações aos cards
+    document.addEventListener('DOMContentLoaded', function() {
+        const cards = document.querySelectorAll('.card-hover');
+        cards.forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-5px)';
+                this.style.boxShadow = '0 4px 25px rgba(0,0,0,0.15)';
+            });
+            
+            card.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0)';
+                this.style.boxShadow = '';
+            });
+        });
+    });
+</script>
+{% endblock javascripts %}

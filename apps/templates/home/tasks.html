@@ -1,0 +1,940 @@
+{% extends "layouts/base.html" %}
+
+{% block title %} Tarefas {% endblock %} 
+
+<!-- Specific Page CSS -->
+{% block stylesheets %}
+<style>
+    /* Override the default Argon header spacing and colors specifically for the
+       tasks page. The primary gradient background is replaced by a light
+       neutral gradient and the padding is reduced to minimise the vertical
+       gap between the green menu bar and the "Nova Tarefa" button. */
+    .header.bg-gradient-primary {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+        /* Adjust padding to maintain enough space for the title and button
+           without overlapping the navigation bar. Using rem units keeps
+           the spacing consistent across devices. */
+        padding-top: 1.5rem !important;
+        padding-bottom: 1.5rem !important;
+    }
+
+    /* Remove the strong negative margin on the content container to
+       prevent the board from overlapping the header. This ensures
+       the "Nova Tarefa" button remains visible. */
+    .container-fluid.mt--7 {
+        margin-top: 0 !important;
+    }
+
+    /* Make the tasks page title black instead of the default white. */
+    .tasks-header-row h2,
+    .tasks-header-row h3,
+    .tasks-header-row h4,
+    .tasks-header-row h5,
+    .tasks-header-row h6 {
+        color: #000 !important;
+    }
+
+    /* Use the same green from the sidebar/menu for the "Nova Tarefa" button.
+       The hover state darkens the colour slightly for feedback. */
+    .new-task-btn {
+        background: #2dce89 !important;
+        border: none;
+        padding: 10px 20px;
+        color: #fff;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        transition: all 0.2s;
+    }
+
+    .new-task-btn:hover {
+        background: #26b57b !important;
+        transform: translateY(-1px);
+    }
+    .kanban-board {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+    }
+
+    @media (min-width: 1200px) {
+        .kanban-board {
+            grid-template-columns: repeat(4, 1fr);
+        }
+    }
+
+    .kanban-column {
+        background: #f8f9fe;
+        border-radius: 12px;
+        padding: 16px;
+        min-height: 500px;
+        border: 1px solid #e3e8ee;
+    }
+
+    .column-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .column-header.pendente {
+        background: linear-gradient(135deg, #fb6340, #fd7e14);
+    }
+
+    .column-header.progresso {
+        background: linear-gradient(135deg, #11cdef, #17a2b8);
+    }
+
+    .column-header.entregue {
+        background: linear-gradient(135deg, #2dce89, #28a745);
+    }
+
+    .column-header.aguardando {
+        background: linear-gradient(135deg, #ffa726, #ff7043);
+    }
+
+    .task-card {
+        background: white;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        border-left: 4px solid;
+        transition: all 0.2s;
+        cursor: grab;
+    }
+
+    .task-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    }
+
+    .task-card:active {
+        cursor: grabbing;
+    }
+
+    .task-card.pendente {
+        border-left-color: #fb6340;
+    }
+
+    .task-card.progresso {
+        border-left-color: #11cdef;
+    }
+
+    .task-card.entregue {
+        border-left-color: #2dce89;
+    }
+
+    .task-card.aguardando {
+        border-left-color: #ffa726;
+    }
+
+    .task-title {
+        font-weight: 600;
+        font-size: 14px;
+        color: #32325d;
+        margin-bottom: 8px;
+    }
+
+    .task-description {
+        font-size: 13px;
+        color: #8898aa;
+        margin-bottom: 12px;
+        line-height: 1.4;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .task-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .task-date {
+        font-size: 12px;
+        color: #8898aa;
+    }
+
+    .task-avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #5e72e4, #825ee4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .priority-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+    }
+
+    .priority-alta {
+        background: #fee2e2;
+        color: #dc2626;
+    }
+
+    .priority-media {
+        background: #fef3c7;
+        color: #d97706;
+    }
+
+    .priority-baixa {
+        background: #dcfce7;
+        color: #16a34a;
+    }
+
+    .drag-over {
+        background: #f3f4f6 !important;
+        border: 2px dashed #8898aa !important;
+    }
+
+    .sortable-ghost {
+        opacity: 0.4;
+        background: #f8f9ff;
+        border: 2px dashed #5e72e4;
+    }
+
+    .sortable-chosen {
+        opacity: 0.8;
+    }
+
+    .sortable-fallback {
+        display: none;
+    }
+
+    .sortable-drag {
+        opacity: 0.8;
+        transform: rotate(2deg);
+    }
+
+    /* Ensure each task-list provides a generous drop area even when empty.
+       Without a minimum height, SortableJS only allows dropping on the
+       header or other cards. */
+    .task-list {
+        min-height: 150px;
+    }
+
+    .task-counter {
+        background: rgba(255,255,255,0.2);
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .new-task-btn {
+        background: #5e72e4;
+        border: none;
+        padding: 10px 20px;
+        color: white;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        transition: all 0.2s;
+    }
+
+    .new-task-btn:hover {
+        background: #4c63d2;
+        transform: translateY(-1px);
+    }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="header bg-gradient-primary pb-8 pt-5 pt-md-8">
+    <div class="container-fluid">
+        <div class="header-body">
+                <div class="row align-items-center tasks-header-row">
+                    <div class="col-lg-6 col-7">
+                        <!-- Título do painel de tarefas: cor preta definida via CSS -->
+                        <h6 class="h2 d-inline-block mb-0">Gerenciamento de Tarefas</h6>
+                    </div>
+                    <div class="col-lg-6 col-5 text-right">
+                        <button type="button" class="new-task-btn" data-bs-toggle="modal" data-bs-target="#newTaskModal">
+                            <i class="ni ni-fat-add"></i> Nova Tarefa
+                        </button>
+                    </div>
+                </div>
+        </div>
+    </div>
+</div>
+
+<!-- Page content -->
+<div class="container-fluid mt--7">
+    <div class="row">
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-body">
+                    <!-- Kanban Board -->
+                    <div class="kanban-board" id="kanban-board">
+                        <!-- Coluna 1: Pendente -->
+                        <div class="kanban-column">
+                            <div class="column-header pendente">
+                                <span>Pendente</span>
+                                <span class="task-counter" id="counter-pendente">0</span>
+                            </div>
+                            <div class="task-list" id="pendente" data-status="Pendente">
+                                {% for task in tasks if task.status == 'Pendente' %}
+                                <div class="task-card pendente" draggable="true"
+                                     data-id="{{ task.id }}"
+                                     data-title="{{ task.title }}"
+                                     data-priority="{{ task.priority }}"
+                                     data-description="{{ task.description }}"
+                                     data-assignee="{{ task.assignee }}"
+                                     data-due-date="{{ task.due_date.isoformat() if task.due_date else '' }}"
+                                     data-observations="{{ task.observations }}">
+                                    <div class="priority-badge priority-{{ task.priority|lower }}">{{ task.priority.upper() }}</div>
+                                    <div class="task-title">{{ task.title }}</div>
+                                    <div class="task-description">{{ task.description }}</div>
+                                    <div class="task-footer">
+                                        <div class="task-date">
+                                            {% if task.due_date %}Vence em: {{ task.due_date.strftime('%d/%m/%Y') }}{% else %}Sem prazo{% endif %}
+                                        </div>
+                                        <div class="task-avatar">
+                                            {% if task.assignee %}
+                                                {{ (task.assignee.split()[0][0] + (task.assignee.split()[1][0] if task.assignee.split()|length > 1 else '')).upper() }}
+                                            {% else %}
+                                                NA
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Coluna 2: Em Progresso -->
+                        <div class="kanban-column">
+                            <div class="column-header progresso">
+                                <span>Em Progresso</span>
+                                <span class="task-counter" id="counter-progresso">0</span>
+                            </div>
+                            <div class="task-list" id="progresso" data-status="Em Progresso">
+                                {% for task in tasks if task.status == 'Em Progresso' %}
+                                <div class="task-card progresso" draggable="true"
+                                     data-id="{{ task.id }}"
+                                     data-title="{{ task.title }}"
+                                     data-priority="{{ task.priority }}"
+                                     data-description="{{ task.description }}"
+                                     data-assignee="{{ task.assignee }}"
+                                     data-due-date="{{ task.due_date.isoformat() if task.due_date else '' }}"
+                                     data-observations="{{ task.observations }}">
+                                    <div class="priority-badge priority-{{ task.priority|lower }}">{{ task.priority.upper() }}</div>
+                                    <div class="task-title">{{ task.title }}</div>
+                                    <div class="task-description">{{ task.description }}</div>
+                                    <div class="task-footer">
+                                        <div class="task-date">
+                                            {% if task.due_date %}Vence em: {{ task.due_date.strftime('%d/%m/%Y') }}{% else %}Sem prazo{% endif %}
+                                        </div>
+                                        <div class="task-avatar">
+                                            {% if task.assignee %}
+                                                {{ (task.assignee.split()[0][0] + (task.assignee.split()[1][0] if task.assignee.split()|length > 1 else '')).upper() }}
+                                            {% else %}
+                                                NA
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Coluna 3: Entregue -->
+                        <div class="kanban-column">
+                            <div class="column-header entregue">
+                                <span>Entregue</span>
+                                <span class="task-counter" id="counter-entregue">0</span>
+                            </div>
+                            <div class="task-list" id="entregue" data-status="Entregue">
+                                {% for task in tasks if task.status == 'Entregue' %}
+                                <div class="task-card entregue" draggable="true"
+                                     data-id="{{ task.id }}"
+                                     data-title="{{ task.title }}"
+                                     data-priority="{{ task.priority }}"
+                                     data-description="{{ task.description }}"
+                                     data-assignee="{{ task.assignee }}"
+                                     data-due-date="{{ task.due_date.isoformat() if task.due_date else '' }}"
+                                     data-observations="{{ task.observations }}">
+                                    <div class="priority-badge priority-{{ task.priority|lower }}">{{ task.priority.upper() }}</div>
+                                    <div class="task-title">{{ task.title }}</div>
+                                    <div class="task-description">{{ task.description }}</div>
+                                    <div class="task-footer">
+                                        <div class="task-date">
+                                            {% if task.due_date %}Entregue: {{ task.due_date.strftime('%d/%m/%Y') }}{% else %}Sem prazo{% endif %}
+                                        </div>
+                                        <div class="task-avatar">
+                                            {% if task.assignee %}
+                                                {{ (task.assignee.split()[0][0] + (task.assignee.split()[1][0] if task.assignee.split()|length > 1 else '')).upper() }}
+                                            {% else %}
+                                                NA
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Coluna 4: Aguardando Nota/Boleto -->
+                        <div class="kanban-column">
+                            <div class="column-header aguardando">
+                                <span>Aguardando Nota/Boleto</span>
+                                <span class="task-counter" id="counter-aguardando">0</span>
+                            </div>
+                            <div class="task-list" id="aguardando" data-status="Aguardando Nota/Boleto">
+                                {% for task in tasks if task.status == 'Aguardando Nota/Boleto' %}
+                                <div class="task-card aguardando" draggable="true"
+                                     data-id="{{ task.id }}"
+                                     data-title="{{ task.title }}"
+                                     data-priority="{{ task.priority }}"
+                                     data-description="{{ task.description }}"
+                                     data-assignee="{{ task.assignee }}"
+                                     data-due-date="{{ task.due_date.isoformat() if task.due_date else '' }}"
+                                     data-observations="{{ task.observations }}">
+                                    <div class="priority-badge priority-{{ task.priority|lower }}">{{ task.priority.upper() }}</div>
+                                    <div class="task-title">{{ task.title }}</div>
+                                    <div class="task-description">{{ task.description }}</div>
+                                    <div class="task-footer">
+                                        <div class="task-date">
+                                            {% if task.due_date %}Vence em: {{ task.due_date.strftime('%d/%m/%Y') }}{% else %}Sem prazo{% endif %}
+                                        </div>
+                                        <div class="task-avatar">
+                                            {% if task.assignee %}
+                                                {{ (task.assignee.split()[0][0] + (task.assignee.split()[1][0] if task.assignee.split()|length > 1 else '')).upper() }}
+                                            {% else %}
+                                                NA
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Nova Tarefa -->
+    <div class="modal fade" id="newTaskModal" tabindex="-1" role="dialog" aria-labelledby="newTaskModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="newTaskModalLabel">Nova Tarefa</h5>
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="newTaskForm">
+                        <div class="form-group">
+                            <label for="taskTitle">Título da Tarefa</label>
+                            <input type="text" class="form-control" id="taskTitle" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="taskDescription">Descrição</label>
+                            <textarea class="form-control" id="taskDescription" rows="3"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="taskPriority">Prioridade</label>
+                            <select class="form-control" id="taskPriority">
+                                <option value="Baixa">Baixa</option>
+                                <option value="Média" selected>Média</option>
+                                <option value="Alta">Alta</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="taskAssignee">Responsável</label>
+                            <input type="text" class="form-control" id="taskAssignee" placeholder="Nome do responsável">
+                        </div>
+                        <div class="form-group">
+                            <label for="taskDueDate">Data de Vencimento</label>
+                            <input type="date" class="form-control" id="taskDueDate">
+                        </div>
+        <div class="form-group">
+            <label for="taskObservations">Observações</label>
+            <textarea class="form-control" id="taskObservations" rows="2"></textarea>
+        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="createNewTask()">Criar Tarefa</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Detalhes da Tarefa (editável) -->
+    <div class="modal fade" id="taskDetailsModal" tabindex="-1" role="dialog" aria-labelledby="taskDetailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="taskDetailsModalLabel">Detalhes da Tarefa</h5>
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <!-- Campo escondido para armazenar o ID da tarefa -->
+                    <input type="hidden" id="editTaskId">
+                    <div class="form-group">
+                        <label for="edit-title">Título</label>
+                        <input type="text" class="form-control" id="edit-title">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-description">Descrição</label>
+                        <textarea class="form-control" id="edit-description" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-priority">Prioridade</label>
+                        <select class="form-control" id="edit-priority">
+                            <option value="Baixa">Baixa</option>
+                            <option value="Média">Média</option>
+                            <option value="Alta">Alta</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-assignee">Responsável</label>
+                        <input type="text" class="form-control" id="edit-assignee">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-due-date">Data de Vencimento</label>
+                        <input type="date" class="form-control" id="edit-due-date">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-observations">Observações</label>
+                        <textarea class="form-control" id="edit-observations" rows="3"></textarea>
+                    </div>
+                    <!-- Campo para anexo de nota/boleta, visível apenas quando o status é "Aguardando Nota/Boleto" -->
+                    <div class="form-group" id="edit-attachment-group" style="display:none;">
+                        <label for="edit-attachment">Nota/Boleto (arquivo)</label>
+                        <input type="file" class="form-control" id="edit-attachment" accept=".pdf,.jpg,.jpeg,.png">
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <p id="edit-status" class="form-control-plaintext"></p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <!-- Botão para concluir a tarefa, visível apenas quando o status for Aguardando Nota/Boleto -->
+                    <button type="button" class="btn btn-success" id="completeTaskBtn" style="display:none;" onclick="completeTask()">Concluir Tarefa</button>
+                    <button type="button" class="btn btn-primary" onclick="saveTaskChanges()">Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock content %}
+
+{% block javascripts %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<script>
+    /**
+     * Inicializa o quadro Kanban e define a lógica de arrastar/soltar
+     * com persistência via API. Cada lista de tarefas (div.task-list)
+     * se torna um contêiner Sortable. Ao finalizar o movimento, a
+     * aplicação chama o endpoint PATCH para atualizar o status e a
+     * posição da tarefa no banco. O contador de cada coluna é
+     * recalculado após toda interação.
+     */
+    document.addEventListener('DOMContentLoaded', function() {
+        const containers = document.querySelectorAll('.task-list');
+
+        containers.forEach(container => {
+            new Sortable(container, {
+                group: 'tasks',
+                animation: 150,
+                draggable: '.task-card',
+                ghostClass: 'sortable-ghost',
+                chosenClass: 'sortable-chosen',
+                dragClass: 'sortable-drag',
+                onEnd: async function(evt) {
+                    // Restaurar aparência após arrastar
+                    document.body.style.cursor = 'default';
+                    evt.item.style.opacity = '1';
+                    evt.item.style.transform = 'rotate(0deg)';
+
+                    const taskId = evt.item.getAttribute('data-id');
+                    const newContainer = evt.to;
+                    const oldContainer = evt.from;
+                    const newStatus = newContainer.getAttribute('data-status');
+                    const oldStatus = oldContainer.getAttribute('data-status');
+                    const newPosition = Array.from(newContainer.children).indexOf(evt.item);
+
+                    // Se mudou de coluna ou posição, atualiza o backend
+                    if (taskId && (newStatus !== oldStatus || evt.oldIndex !== evt.newIndex)) {
+                        try {
+                            const response = await fetch(`/api/tasks/${taskId}/status`, {
+                                method: 'PATCH',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    status: newStatus,
+                                    posicao: newPosition
+                                })
+                            });
+                            if (!response.ok) {
+                                console.error('Erro ao atualizar tarefa:', response.statusText);
+                            }
+                        } catch (error) {
+                            console.error('Erro ao atualizar tarefa:', error);
+                        }
+                    }
+
+                    // Atualiza a classe visual do card conforme a coluna
+                    updateCardStyle(evt.item, newContainer.id);
+                    // Atualiza o atributo data-status do cartão para refletir o novo status
+                    evt.item.setAttribute('data-status', newStatus);
+                    // Atualiza contadores de cada coluna
+                    updateCounters();
+                },
+                onStart: function(evt) {
+                    document.body.style.cursor = 'grabbing';
+                    evt.item.style.opacity = '0.8';
+                    evt.item.style.transform = 'rotate(2deg)';
+                }
+            });
+        });
+        // Atualiza contadores após carregamento inicial
+        updateCounters();
+    });
+
+    /**
+     * Atualiza a classe CSS de um cartão com base no ID do contêiner
+     * (pendente, progresso, entregue ou aguardando) para ajustar as
+     * cores de borda e título.
+     */
+    function updateCardStyle(card, newContainerId) {
+        card.classList.remove('pendente', 'progresso', 'entregue', 'aguardando');
+        card.classList.add(newContainerId);
+    }
+
+    /**
+     * Percorre todas as colunas e define o número de cartões exibido
+     * em cada contagem visualmente no cabeçalho.
+     */
+    function updateCounters() {
+        const columns = ['pendente', 'progresso', 'entregue', 'aguardando'];
+        columns.forEach(column => {
+            const list = document.getElementById(column);
+            const counter = document.getElementById(`counter-${column}`);
+            const taskCount = list.querySelectorAll('.task-card').length;
+            counter.textContent = taskCount;
+        });
+    }
+
+    /**
+     * Cria uma nova tarefa persistindo no backend via POST. Após
+     * receber a resposta, insere o cartão no DOM com o ID
+     * retornado. A tarefa é sempre criada no status Pendente.
+     */
+    function createNewTask() {
+        const title = document.getElementById('taskTitle').value.trim();
+        const description = document.getElementById('taskDescription').value.trim();
+        const priority = document.getElementById('taskPriority').value;
+        const assignee = document.getElementById('taskAssignee').value.trim();
+        const dueDate = document.getElementById('taskDueDate').value;
+        const observations = document.getElementById('taskObservations').value.trim();
+
+        if (!title) {
+            alert('Por favor, insira um título para a tarefa.');
+            return;
+        }
+
+        const taskData = {
+            title: title,
+            description: description,
+            observations: observations,
+            priority: priority,
+            assignee: assignee,
+            // A API espera dueDate no formato AAAA-MM-DD
+            dueDate: dueDate || null,
+            status: 'Pendente'
+        };
+
+        fetch('/api/tasks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(taskData)
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Erro ao criar tarefa');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // A API retorna o id da tarefa recém-criada em task_id
+            const taskId = data.task_id || data.id || (data.task && data.task.id);
+            const initials = assignee ? assignee.split(' ').map(word => word[0]).join('').toUpperCase().substring(0, 2) : 'NA';
+            const formattedDate = dueDate ? new Date(dueDate).toLocaleDateString('pt-BR') : '';
+            const newTaskHTML = `
+                <div class="task-card pendente" draggable="true" data-id="${taskId}"
+                     data-title="${title}"
+                     data-priority="${priority}"
+                     data-description="${description}"
+                     data-assignee="${assignee}"
+                     data-due-date="${dueDate}"
+                     data-observations="${observations}">
+                    <div class="priority-badge priority-${priority.toLowerCase()}">${priority.toUpperCase()}</div>
+                    <div class="task-title">${title}</div>
+                    <div class="task-description">${description}</div>
+                    <div class="task-footer">
+                        <div class="task-date">${formattedDate ? `Vence em: ${formattedDate}` : 'Sem prazo'}</div>
+                        <div class="task-avatar">${initials}</div>
+                    </div>
+                </div>
+            `;
+            const pendenteList = document.getElementById('pendente');
+            pendenteList.insertAdjacentHTML('beforeend', newTaskHTML);
+            updateCounters();
+            document.getElementById('newTaskForm').reset();
+            $('#newTaskModal').modal('hide');
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Não foi possível criar a tarefa.');
+        });
+    }
+
+    // Variável global que armazena o cartão atualmente sendo editado.
+    let currentEditingCard = null;
+
+    // Evento delegado para abrir o modal de edição quando um cartão é clicado.
+    document.addEventListener('click', function(e) {
+        // Ignora cliques dentro de modais para não disparar a edição novamente
+        if (e.target.closest('.modal-content')) {
+            return;
+        }
+        const card = e.target.closest('.task-card');
+        if (card) {
+            currentEditingCard = card;
+            // Preenche o formulário do modal com os dados da tarefa
+            const taskId = card.getAttribute('data-id');
+            const title = card.getAttribute('data-title') || '';
+            const description = card.getAttribute('data-description') || '';
+            const priority = card.getAttribute('data-priority') || '';
+            const assignee = card.getAttribute('data-assignee') || '';
+            const dueDateRaw = card.getAttribute('data-due-date') || '';
+            const observations = card.getAttribute('data-observations') || '';
+            // Status é lido do contêiner pai
+            const status = card.parentElement.getAttribute('data-status') || '';
+
+            document.getElementById('editTaskId').value = taskId;
+            document.getElementById('edit-title').value = title;
+            document.getElementById('edit-description').value = description;
+            document.getElementById('edit-priority').value = priority;
+            document.getElementById('edit-assignee').value = assignee;
+            document.getElementById('edit-due-date').value = dueDateRaw;
+            document.getElementById('edit-observations').value = observations;
+            document.getElementById('edit-status').textContent = status;
+
+            // Exibe o modal de edição
+            $('#taskDetailsModal').modal('show');
+
+        // Mostrar ou ocultar o botão "Concluir Tarefa" e o campo de anexo conforme o status
+        const completeBtn = document.getElementById('completeTaskBtn');
+        const attachmentGroup = document.getElementById('edit-attachment-group');
+        const attachmentInput = document.getElementById('edit-attachment');
+
+        if (status === 'Aguardando Nota/Boleto') {
+            // Fluxo atual do Financeiro (mantido): exige anexo
+            if (completeBtn) completeBtn.style.display = 'inline-block';
+            if (attachmentGroup) attachmentGroup.style.display = 'block';
+        } else if (status === 'Entregue') {
+            // Novo fluxo: concluir sem anexo -> vai para Tarefas Concluídas
+            if (completeBtn) completeBtn.style.display = 'inline-block';
+            if (attachmentGroup) attachmentGroup.style.display = 'none';
+        } else {
+            if (completeBtn) completeBtn.style.display = 'none';
+            if (attachmentGroup) attachmentGroup.style.display = 'none';
+        }
+
+        if (attachmentInput) {
+            attachmentInput.value = '';
+        }
+        }
+    });
+
+    /**
+     * Salva as alterações feitas no modal de edição de tarefas. Faz uma requisição
+     * PATCH para atualizar a tarefa no backend e atualiza o cartão no DOM.
+     */
+    function saveTaskChanges() {
+        if (!currentEditingCard) return;
+        const taskId = document.getElementById('editTaskId').value;
+        const title = document.getElementById('edit-title').value.trim();
+        const description = document.getElementById('edit-description').value.trim();
+        const priority = document.getElementById('edit-priority').value;
+        const assignee = document.getElementById('edit-assignee').value.trim();
+        const dueDate = document.getElementById('edit-due-date').value;
+        const observations = document.getElementById('edit-observations').value.trim();
+        const status = currentEditingCard.parentElement.getAttribute('data-status');
+
+        const payload = {
+            title: title,
+            description: description,
+            observations: observations,
+            priority: priority,
+            assignee: assignee,
+            dueDate: dueDate || '',
+            status: status
+        };
+
+        fetch(`/api/tasks/${taskId}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Erro ao atualizar tarefa');
+            }
+            return response.json();
+        })
+        .then(() => {
+            // Atualiza atributos de dados do cartão
+            currentEditingCard.setAttribute('data-title', title);
+            currentEditingCard.setAttribute('data-description', description);
+            currentEditingCard.setAttribute('data-priority', priority);
+            currentEditingCard.setAttribute('data-assignee', assignee);
+            currentEditingCard.setAttribute('data-due-date', dueDate);
+            currentEditingCard.setAttribute('data-observations', observations);
+
+            // Atualiza o conteúdo exibido no cartão
+            currentEditingCard.querySelector('.task-title').textContent = title;
+            currentEditingCard.querySelector('.task-description').textContent = description;
+            // Atualiza a data
+            const dateElem = currentEditingCard.querySelector('.task-date');
+            if (dueDate) {
+                const dateObj = new Date(dueDate);
+                dateElem.textContent = 'Vence em: ' + dateObj.toLocaleDateString('pt-BR');
+            } else {
+                dateElem.textContent = 'Sem prazo';
+            }
+            // Atualiza o avatar
+            const avatarElem = currentEditingCard.querySelector('.task-avatar');
+            const initials = assignee ? assignee.split(' ').map(word => word[0]).join('').toUpperCase().substring(0, 2) : 'NA';
+            avatarElem.textContent = initials;
+            // Atualiza a badge de prioridade
+            const badge = currentEditingCard.querySelector('.priority-badge');
+            badge.classList.remove('priority-alta', 'priority-media', 'priority-baixa');
+            const lowerPriority = priority.toLowerCase();
+            badge.classList.add('priority-' + lowerPriority);
+            badge.textContent = priority.toUpperCase();
+
+            // Fecha o modal
+            $('#taskDetailsModal').modal('hide');
+            currentEditingCard = null;
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Não foi possível atualizar a tarefa.');
+        });
+    }
+
+    /**
+     * Conclui a tarefa atualmente em edição. Mostra uma confirmação ao usuário
+     * e, em caso afirmativo, envia uma requisição para mover a tarefa para a
+     * tabela de tarefas concluídas. Remove o cartão do DOM e atualiza os
+     * contadores.
+     */
+    function completeTask() {
+        if (!currentEditingCard) return;
+        const taskId = currentEditingCard.getAttribute('data-id');
+        const confirmMsg = 'Tem certeza de que deseja concluir esta tarefa?';
+        if (!confirm(confirmMsg)) {
+            return;
+        }
+        // Coleta os valores do formulário para atualizar a tarefa antes de concluir
+        const title = document.getElementById('edit-title').value.trim();
+        const description = document.getElementById('edit-description').value.trim();
+        const priority = document.getElementById('edit-priority').value;
+        const assignee = document.getElementById('edit-assignee').value.trim();
+        const dueDate = document.getElementById('edit-due-date').value;
+        const observations = document.getElementById('edit-observations').value.trim();
+        const status = currentEditingCard.parentElement.getAttribute('data-status');
+        const attachmentInput = document.getElementById('edit-attachment');
+        const file = attachmentInput ? attachmentInput.files[0] : null;
+        // Se estiver aguardando nota/boleta, exigir o anexo
+        if (status === 'Aguardando Nota/Boleto' && (!file || !file.name)) {
+            alert('É necessário anexar a nota ou boleto antes de concluir a tarefa.');
+            return;
+        }
+        const formData = new FormData();
+        formData.append('title', title);
+        formData.append('description', description);
+        formData.append('observations', observations);
+        formData.append('priority', priority);
+        formData.append('assignee', assignee);
+        formData.append('due_date', dueDate || '');
+        formData.append('status', status);
+        if (file) {
+            formData.append('attachment', file);
+        }
+        fetch(`/api/tasks/${taskId}/complete`, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => { throw new Error(data.message || 'Erro ao concluir a tarefa'); });
+            }
+            return response.json();
+        })
+        .then(() => {
+            // Atualiza atributos de dados do cartão para refletir os valores salvos
+            currentEditingCard.setAttribute('data-title', title);
+            currentEditingCard.setAttribute('data-description', description);
+            currentEditingCard.setAttribute('data-priority', priority);
+            currentEditingCard.setAttribute('data-assignee', assignee);
+            currentEditingCard.setAttribute('data-due-date', dueDate);
+            currentEditingCard.setAttribute('data-observations', observations);
+            // Remove o cartão do DOM
+            const parent = currentEditingCard.parentElement;
+            parent.removeChild(currentEditingCard);
+            currentEditingCard = null;
+            // Fechar o modal
+            $('#taskDetailsModal').modal('hide');
+            // Atualizar contadores
+            updateCounters();
+        })
+        .catch(err => {
+            console.error(err);
+            alert(err.message || 'Não foi possível concluir a tarefa.');
+        });
+    }
+</script>
+{% endblock %}

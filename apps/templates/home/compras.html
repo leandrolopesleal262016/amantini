@@ -1,0 +1,288 @@
+{% extends "layouts/base.html" %}
+
+{% block title %} Compras {% endblock %}
+
+{% block stylesheets %}
+<style>
+    /* Adapta a aparência da página de compras para seguir o tema claro/verde. */
+    .header.bg-gradient-primary {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+        padding-top: 1.5rem !important;
+        padding-bottom: 1.5rem !important;
+    }
+    .container-fluid.mt--7 {
+        margin-top: 0 !important;
+    }
+    .header-title {
+        color: #000 !important;
+    }
+    body {
+        background-color: #f8f9fa !important;
+    }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="header bg-gradient-primary pb-8 pt-5 pt-md-8">
+    <div class="container-fluid">
+        <div class="header-body">
+            <div class="row align-items-center">
+                <div class="col-lg-6 col-7">
+                    <h6 class="h2 d-inline-block mb-0 header-title">Compras</h6>
+                </div>
+                <div class="col-lg-6 col-5 text-right">
+                    <!-- Botão renomeado para "Novo Orçamento" seguindo a nomenclatura solicitada -->
+                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#newCompraModal">
+                        <i class="ni ni-fat-add"></i> Novo Orçamento
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Page content -->
+<div class="container-fluid mt--7">
+    <div class="row">
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table align-items-center table-flush">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th scope="col">Fornecedor</th>
+                                    <th scope="col">Valor</th>
+                                    <!-- Mostra a data do orçamento ou, em falta, a data de criação -->
+                                    <th scope="col">Data do Orçamento</th>
+                                    <th scope="col">Anexo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for compra in compras %}
+                                <tr>
+                                    <th scope="row">{{ compra.fornecedor.nome }}</th>
+                                    <td>R$ {{ '%.2f' | format(compra.valor) }}</td>
+                                    <td>
+                                        {# Exibe data_orcamento se existir, caso contrário data_criacao #}
+                                        {% if compra.data_orcamento %}
+                                            {{ compra.data_orcamento.strftime('%d/%m/%Y') }}
+                                        {% else %}
+                                            {{ compra.data_criacao.strftime('%d/%m/%Y') }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if compra.attachment_path %}
+                                            <a href="/orcamentos/{{ compra.attachment_path }}" target="_blank">Download</a>
+                                        {% else %}
+                                            Nenhum
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Modal Nova Compra -->
+    <div class="modal fade" id="newCompraModal" tabindex="-1" role="dialog" aria-labelledby="newCompraModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <!-- Título atualizado para refletir a criação de um novo orçamento -->
+                    <h5 class="modal-title" id="newCompraModalLabel">Novo Orçamento</h5>
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="newCompraForm">
+                        <div class="form-group">
+                            <label for="compra-fornecedor">Fornecedor</label>
+                            <select class="form-control" id="compra-fornecedor" name="fornecedor_id">
+                                {% for fornecedor in fornecedores %}
+                                    <option value="{{ fornecedor.id }}">{{ fornecedor.nome_fantasia or fornecedor.nome }}</option>
+                                {% endfor %}
+                                <option value="novo">Incluir novo fornecedor…</option>
+                            </select>
+                        </div>
+                        <!-- Formulário para adicionar um novo fornecedor -->
+                        <div class="border rounded p-3" id="novo-fornecedor-group" style="display:none;">
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <label class="form-label">Nome Fantasia *</label>
+                                    <input type="text" class="form-control" id="nf_nome_fantasia" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Razão Social</label>
+                                    <input type="text" class="form-control" id="nf_razao_social">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">CNPJ</label>
+                                    <input type="text" class="form-control" id="nf_cnpj" placeholder="00.000.000/0000-00">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">IE</label>
+                                    <input type="text" class="form-control" id="nf_ie">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">IM</label>
+                                    <input type="text" class="form-control" id="nf_im">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">E-mail</label>
+                                    <input type="email" class="form-control" id="nf_email">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Telefone</label>
+                                    <input type="text" class="form-control" id="nf_telefone">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Celular/WhatsApp</label>
+                                    <input type="text" class="form-control" id="nf_celular">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">CEP</label>
+                                    <input type="text" class="form-control" id="nf_cep">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Logradouro</label>
+                                    <input type="text" class="form-control" id="nf_logradouro">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Número</label>
+                                    <input type="text" class="form-control" id="nf_numero">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Bairro</label>
+                                    <input type="text" class="form-control" id="nf_bairro">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Cidade</label>
+                                    <input type="text" class="form-control" id="nf_cidade">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">UF</label>
+                                    <input type="text" class="form-control" id="nf_estado" maxlength="2">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Observações</label>
+                                    <textarea class="form-control" id="nf_obs" rows="2"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="compra-valor">Valor do Orçamento</label>
+                            <input type="number" step="0.01" class="form-control" id="compra-valor" placeholder="0,00">
+                        </div>
+                        <!-- Campo para selecionar a data do orçamento -->
+                        <div class="form-group">
+                            <label for="compra-data">Data do Orçamento</label>
+                            <input type="date" class="form-control" id="compra-data">
+                        </div>
+                        <div class="form-group">
+                            <label for="compra-anexo">Anexar Orçamento (PDF/Imagem)</label>
+                            <input type="file" class="form-control" id="compra-anexo">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-success" onclick="createCompra()">Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock content %}
+
+{% block javascripts %}
+<script>
+// Mostra ou esconde o formulário de novo fornecedor conforme a seleção
+document.addEventListener('DOMContentLoaded', function() {
+    const fornecedorSelect = document.getElementById('compra-fornecedor');
+    const novoFornecedorGroup = document.getElementById('novo-fornecedor-group');
+    fornecedorSelect.addEventListener('change', function() {
+        novoFornecedorGroup.style.display = (this.value === 'novo') ? 'block' : 'none';
+    });
+});
+
+async function createCompra() {
+    const fornecedorSelect = document.getElementById('compra-fornecedor');
+    let fornecedorId = fornecedorSelect.value;
+    const valor = document.getElementById('compra-valor').value;
+    const anexoInput = document.getElementById('compra-anexo');
+    const dataInput = document.getElementById('compra-data');
+    // Se for novo fornecedor, envia dados para a API de fornecedores
+    if (fornecedorId === 'novo') {
+        const payload = {
+            nome_fantasia: document.getElementById('nf_nome_fantasia').value.trim(),
+            razao_social:  document.getElementById('nf_razao_social').value.trim(),
+            cnpj:          document.getElementById('nf_cnpj').value.trim(),
+            ie:            document.getElementById('nf_ie').value.trim(),
+            im:            document.getElementById('nf_im').value.trim(),
+            email:         document.getElementById('nf_email').value.trim(),
+            telefone:      document.getElementById('nf_telefone').value.trim(),
+            celular:       document.getElementById('nf_celular').value.trim(),
+            cep:           document.getElementById('nf_cep').value.trim(),
+            logradouro:    document.getElementById('nf_logradouro').value.trim(),
+            numero:        document.getElementById('nf_numero').value.trim(),
+            bairro:        document.getElementById('nf_bairro').value.trim(),
+            cidade:        document.getElementById('nf_cidade').value.trim(),
+            estado:        document.getElementById('nf_estado').value.trim().toUpperCase(),
+            obs:           document.getElementById('nf_obs').value.trim()
+        };
+        if (!payload.nome_fantasia) {
+            alert('Informe o Nome Fantasia do fornecedor.');
+            return;
+        }
+        try {
+            const resp = await fetch('/api/fornecedores', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const out = await resp.json();
+            if (!resp.ok || !out.success) {
+                alert(out.message || 'Erro ao criar fornecedor.');
+                return;
+            }
+            fornecedorId = out.fornecedor_id;
+        } catch(e) {
+            alert('Erro ao criar fornecedor.');
+            return;
+        }
+    }
+    const formData = new FormData();
+    formData.append('fornecedor_id', fornecedorId);
+    formData.append('valor', valor);
+    const dataValor = dataInput.value;
+    if (dataValor) {
+        formData.append('data', dataValor);
+    }
+    if (anexoInput.files && anexoInput.files.length > 0) {
+        formData.append('anexo', anexoInput.files[0]);
+    }
+    try {
+        const respCompra = await fetch('/api/compras', {
+            method: 'POST',
+            body: formData
+        });
+        const out2 = await respCompra.json();
+        if (!respCompra.ok || !out2.success) {
+            alert(out2.message || 'Erro ao criar orçamento.');
+            return;
+        }
+        location.reload();
+    } catch(e) {
+        alert('Erro ao criar compra.');
+    }
+}
+</script>
+{% endblock javascripts %}

@@ -1,0 +1,102 @@
+{% extends "layouts/base.html" %}
+
+{% block title %} Kanban de Pedidos de Compra {% endblock %}
+
+{% block stylesheets %}
+<style>
+/* Estilos básicos para o quadro Kanban */
+.kanban-board {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+.kanban-column {
+    flex: 1;
+    min-width: 250px;
+    background: #f8f9fe;
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+.kanban-column h4 {
+    margin-bottom: 1rem;
+    text-transform: capitalize;
+    font-weight: 600;
+}
+.kanban-card {
+    background: #fff;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    cursor: grab;
+}
+.kanban-card strong {
+    font-size: 0.875rem;
+}
+.kanban-card .status-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+}
+.kanban-card .priority-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+}
+/* Cores para status */
+.status-solicitado { background-color: #ffeaa7; color: #2d3436; }
+.status-aprovado { background-color: #74b9ff; color: #fff; }
+.status-em_compra { background-color: #fd79a8; color: #fff; }
+.status-entregue { background-color: #00b894; color: #fff; }
+/* Cores para prioridades */
+.priority-baixa { background-color: #d4edda; color: #155724; }
+.priority-media { background-color: #fff3cd; color: #856404; }
+.priority-alta { background-color: #f8d7da; color: #721c24; }
+.priority-urgente { background-color: #dc3545; color: #fff; }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+<div class="header bg-gradient-primary pb-6 pt-5 pt-md-7">
+    <div class="container-fluid">
+        <div class="header-body">
+            <div class="row">
+                <div class="col-12">
+                    <h2 class="text-white">Kanban - Pedidos de Compra</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="container-fluid mt--7">
+    <div class="kanban-board">
+        {% for status in ['solicitado','aprovado','em_compra','entregue'] %}
+        <div class="kanban-column" id="column-{{ status }}" data-status="{{ status }}">
+            <h4>{{ status|replace('_', ' ')|title }}</h4>
+            {% for pedido in pedidos if pedido.status == status %}
+            <div class="kanban-card" data-id="{{ pedido.id }}">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <strong>Pedido #{{ pedido.id }}</strong>
+                    <span class="status-badge status-{{ pedido.status }}">{{ pedido.status|replace('_', ' ')|title }}</span>
+                </div>
+                <div><small>Obra:</small> {{ pedido.obra }}</div>
+                <div><small>Responsável:</small> {{ pedido.responsavel }}</div>
+                <div><small>Prioridade:</small> <span class="priority-badge priority-{{ pedido.prioridade }}">{{ pedido.prioridade|title }}</span></div>
+                <div><small>Itens:</small> {{ pedido.itens|length }}</div>
+                <a href="{{ url_for('home_blueprint.ver_pedido_compra', pedido_id=pedido.id) }}" class="btn btn-link btn-sm p-0 mt-1">Ver</a>
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock content %}
+
+{% block javascripts %}
+    <!-- Biblioteca SortableJS para drag and drop -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <!-- Script personalizado do Kanban -->
+    <script src="{{ url_for('static', filename='assets/js/custom/kanban.js') }}"></script>
+{% endblock javascripts %}

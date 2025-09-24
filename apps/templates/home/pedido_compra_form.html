@@ -1,0 +1,766 @@
+{% extends "layouts/base.html" %}
+
+{% block title %} Pedido de Compra {% endblock %}
+
+<!-- Specific Page CSS goes HERE  -->
+<!-- Substitua a seção de estilos no seu arquivo pedido_compra_form.html por esta versão -->
+
+{% block stylesheets %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<style>
+    .header.bg-gradient-primary {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+    }
+    .card.card-body.bg-light {
+    background-color: #f0f0f0   !important;
+    }
+    .section-title {
+        color: #5e72e4;
+        border-bottom: 2px solid #f8f9fe;
+        padding-bottom: 0.5rem;
+        margin-bottom: 1.5rem;
+    }
+    .item-row {
+        background: #f8f9fe;
+        border: 1px solid #e9ecef;
+        border-radius: 0.375rem;
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        transition: all 0.3s ease;
+    }
+    .item-row:hover {
+        box-shadow: 0 4px 6px rgba(50, 50, 93, 0.11);
+        transform: translateY(-1px);
+    }
+
+    /* === CORREÇÃO PARA ALINHAMENTO VERTICAL DOS TEXTOS === */
+    
+    /* Correção para campos de formulário */
+    .form-control {
+        display: flex !important;
+        align-items: center !important;
+        line-height: 1.5 !important;
+        min-height: 38px !important;
+        padding: 0.375rem 0.75rem !important;
+    }
+
+    /* Correção específica para selects */
+    select.form-control {
+        height: 38px !important;
+        line-height: 38px !important;
+        padding: 0 0.75rem !important;
+        vertical-align: middle !important;
+        appearance: menulist !important;
+    }
+
+    /* Correção para inputs de texto e número */
+    input.form-control {
+        height: 38px !important;
+        line-height: 1.5 !important;
+        padding: 0.375rem 0.75rem !important;
+        vertical-align: middle !important;
+    }
+
+    /* Correção para textarea */
+    textarea.form-control {
+        min-height: auto !important;
+        display: block !important;
+        line-height: 1.5 !important;
+        padding: 0.375rem 0.75rem !important;
+    }
+
+    /* Correção específica para Select2 */
+    .select2-container--classic .select2-selection--single {
+        height: 38px !important;
+        border: 1px solid #cad1d7 !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    .select2-container--classic .select2-selection--single .select2-selection__rendered {
+        line-height: 1.5 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        vertical-align: middle !important;
+    }
+
+    .select2-container--classic .select2-selection--single .select2-selection__arrow {
+        height: 36px !important;
+        top: 1px !important;
+        right: 1px !important;
+    }
+
+    /* Garantir que os placeholders também fiquem centralizados */
+    .form-control::placeholder {
+        vertical-align: middle !important;
+        line-height: 1.5 !important;
+    }
+
+    /* Correção para campos de data */
+    input[type="date"].form-control {
+        height: 38px !important;
+        line-height: 1.5 !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    /* Correção para campos numéricos */
+    input[type="number"].form-control {
+        height: 38px !important;
+        line-height: 1.5 !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    /* Garante que os labels fiquem alinhados */
+    .form-control-label {
+        margin-bottom: 0.5rem !important;
+        font-weight: 600 !important;
+        color: #525f7f !important;
+    }
+
+    /* Correção adicional para compatibilidade com Bootstrap */
+    .form-group {
+        margin-bottom: 1rem !important;
+    }
+
+    .form-group .form-control:focus {
+        border-color: #5e72e4 !important;
+        box-shadow: 0 0 0 0.2rem rgba(94, 114, 228, 0.25) !important;
+    }
+
+    /* === FIM DA CORREÇÃO === */
+
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+<div class="header bg-gradient-primary pb-8 pt-5 pt-md-8">
+    <div class="container-fluid">
+        <div class="header-body">
+            <div class="row">
+                <div class="col-xl-3 col-lg-6">
+                    <div class="card card-stats mb-4 mb-xl-0">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col">
+                                    <h5 class="card-title text-uppercase text-muted mb-0">Total Pedidos</h5>
+                                    <span class="h2 font-weight-bold mb-0">42</span>
+                                </div>
+                                <div class="col-auto">
+                                    <div class="icon icon-shape bg-danger text-white rounded-circle shadow">
+                                        <i class="fas fa-chart-bar"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid mt--7">
+    <div class="row">
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-header border-0">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <h3 class="mb-0">
+                                <i class="fas fa-shopping-cart me-2"></i>
+                                {% if pedido %}Editar Pedido de Compra{% else %}Novo Pedido de Compra{% endif %}
+                            </h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form id="pedidoCompraForm" method="POST" 
+                          action="{% if pedido %}{{ url_for('home_blueprint.atualizar_pedido_compra', pedido_id=pedido.id) }}{% else %}{{ url_for('home_blueprint.criar_pedido_compra') }}{% endif %}">
+                        
+                        <!-- Informações Básicas -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h4 class="section-title">
+                                    <i class="fas fa-info-circle me-2"></i>Informações Básicas
+                                </h4>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-control-label" for="responsavel">Responsável</label>
+                                    <select class="form-control" id="responsavel" name="responsavel" data-toggle="select" data-size="7" required>
+                                        <option value="">Selecione o responsável...</option>
+                                        <option value="Isabela" {% if pedido and pedido.responsavel == 'Isabela' %}selected{% endif %}>Isabela</option>
+                                        <option value="Lucca" {% if pedido and pedido.responsavel == 'Lucca' %}selected{% endif %}>Lucca</option>
+                                        <option value="Victor" {% if pedido and pedido.responsavel == 'Victor' %}selected{% endif %}>Victor</option>
+                                        <option value="Deodato" {% if pedido and pedido.responsavel == 'Deodato' %}selected{% endif %}>Deodato</option>
+                                        <option value="Wagner" {% if pedido and pedido.responsavel == 'Wagner' %}selected{% endif %}>Wagner</option>
+                                        <option value="Felipe" {% if pedido and pedido.responsavel == 'Felipe' %}selected{% endif %}>Felipe</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label class="form-control-label" for="prioridade">Prioridade</label>
+                                    <select class="form-control" id="prioridade" name="prioridade" data-toggle="select" required>
+                                        <option value="baixa" {% if pedido and pedido.prioridade == 'baixa' %}selected{% endif %}>Baixa</option>
+                                        <option value="media" {% if pedido and pedido.prioridade == 'media' %}selected{% endif %}>Média</option>
+                                        <option value="alta" {% if pedido and pedido.prioridade == 'alta' %}selected{% endif %}>Alta</option>
+                                        <option value="urgente" {% if pedido and pedido.prioridade == 'urgente' %}selected{% endif %}>Urgente</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    <label class="form-control-label" for="data_necessidade">Data de Necessidade</label>
+                                    <input type="date" class="form-control" id="data_necessidade" name="data_necessidade" 
+                                           value="{% if pedido %}{{ pedido.data_necessidade }}{% endif %}" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Status (só aparece na edição) -->
+                        {% if pedido %}
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-control-label" for="status">Status</label>
+                                    <select class="form-control" id="status" name="status" data-toggle="select">
+                                        <option value="solicitado" {% if pedido.status == 'solicitado' %}selected{% endif %}>Solicitado</option>
+                                        <option value="aprovado" {% if pedido.status == 'aprovado' %}selected{% endif %}>Aprovado</option>
+                                        <option value="em_compra" {% if pedido.status == 'em_compra' %}selected{% endif %}>Em Compra</option>
+                                        <option value="entregue" {% if pedido.status == 'entregue' %}selected{% endif %}>Entregue</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <input type="hidden" id="status" name="status" value="solicitado">
+                        {% endif %}
+
+                        <!-- Seção para adicionar o campo Observação -->
+<!-- Substitua esta parte no seu arquivo pedido_compra_form.html -->
+
+<!-- Adicionar Item -->
+<div class="row mb-4">
+    <div class="col-12">
+        <h4 class="section-title">
+            <i class="fas fa-plus-circle me-2"></i>Adicionar Item
+        </h4>
+    </div>
+    <div class="col-12">
+        <div class="card card-body bg-light">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label class="form-control-label">Item</label>
+                        <select class="form-control" id="novoItem" data-toggle="select" data-size="7">
+                            {# A lista de itens é gerada a partir da planilha de materiais e incluída aqui #}
+                            {% include 'home/_material_options.html' %}
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Coluna de observação e cadastro de novo item -->
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label class="form-control-label">Observação</label>
+                        <input type="text" class="form-control" id="novaObservacao" 
+                               placeholder="Ex: Cor branca, Marca específica...">
+                        <small class="text-muted">Cor, marca, especificação...</small>
+                        <!-- Campo para cadastrar novo item, exibido somente quando a opção 'Incluir novo item...' é selecionada -->
+                        <div id="novoItemNomeGroup" style="display:none; margin-top:0.5rem;">
+                            <label class="form-control-label">Novo item</label>
+                            <input type="text" class="form-control" id="novoItemNome" placeholder="Digite o nome do novo item">
+                            <small class="text-muted">Nome do item que não está na lista</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-2">
+                    <div class="form-group">
+                        <label class="form-control-label">Quantidade</label>
+                        <input type="number" class="form-control" id="novaQuantidade" 
+                               placeholder="0" min="0" step="0.01">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-group">
+                        <label class="form-control-label">Unidade</label>
+                        <select class="form-control" id="novaUnidade">
+                            <option value="un">Unidades (un)</option>
+                            <option value="m">Metros (m)</option>
+                            <option value="m2">Metros² (m²)</option>
+                            <option value="m3">Metros³ (m³)</option>
+                            <option value="kg">Quilos (kg)</option>
+                            <option value="sc">Sacas (sc)</option>
+                            <option value="gl">Galões (gl)</option>
+                            <option value="cx">Caixas (cx)</option>
+                            <option value="pc">Peças (pc)</option>
+                            <option value="lt">Litros (lt)</option>
+                            <option value="ton">Toneladas (ton)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-group">
+                        <label class="form-control-label">&nbsp;</label>
+                        <button type="button" class="btn btn-success btn-block" onclick="adicionarItem()">
+                            <i class="fas fa-plus"></i> Adicionar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript atualizado -->
+<script>
+    let itens = [];
+    let contadorItem = 0;
+
+    function adicionarItem() {
+        const selectEl = document.getElementById('novoItem');
+        let item = selectEl.value;
+        const observacao = document.getElementById('novaObservacao').value;
+        const quantidade = document.getElementById('novaQuantidade').value;
+        const unidade = document.getElementById('novaUnidade').value;
+
+        if (!quantidade || quantidade <= 0) {
+            alert('Por favor, informe uma quantidade válida.');
+            return;
+        }
+
+        // Se o usuário selecionou "Incluir novo item...", obtemos o nome do novo item e geramos um código slug
+        let itemTexto;
+        if (item === 'novo') {
+            const nomeNovo = document.getElementById('novoItemNome').value.trim();
+            if (!nomeNovo) {
+                alert('Digite o nome do novo item.');
+                return;
+            }
+            // Função para slugificar o nome (remover acentos e espaços)
+            const slugify = (str) => {
+                return str.toString().toLowerCase()
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/[^a-z0-9]+/g, '_')
+                    .replace(/^_+|_+$/g, '');
+            };
+            itemTexto = nomeNovo;
+            item = slugify(nomeNovo);
+            // Opcional: adicionar o novo item à lista suspensa para reutilizar
+            const newOption = new Option(nomeNovo, item, false, false);
+            selectEl.add(newOption);
+        } else {
+            // Usa o texto da opção selecionada
+            itemTexto = selectEl.selectedOptions[0].text;
+        }
+
+        if (!item) {
+            alert('Por favor, selecione um item.');
+            return;
+        }
+
+        const novoItem = {
+            id: ++contadorItem,
+            codigo: item,
+            nome: itemTexto,
+            observacao: observacao || '',
+            quantidade: parseFloat(quantidade),
+            unidade: unidade
+        };
+
+        itens.push(novoItem);
+        renderizarItens();
+
+        // Limpar campos
+        document.getElementById('novoItem').value = '';
+        document.getElementById('novoItemNome').value = '';
+        document.getElementById('novoItemNomeGroup').style.display = 'none';
+        document.getElementById('novaObservacao').value = '';
+        document.getElementById('novaQuantidade').value = '';
+        document.getElementById('novaUnidade').value = 'un';
+        $('#novoItem').select2('val', '');
+    }
+
+    function renderizarItens() {
+        const container = document.getElementById('listaItens');
+        const contador = document.getElementById('contadorItens');
+        
+        if (itens.length === 0) {
+            container.innerHTML = `
+                <div class="text-center text-muted p-4">
+                    <i class="fas fa-box-open fa-3x mb-3"></i>
+                    <p>Nenhum item adicionado ainda.<br>Use o formulário acima para adicionar itens.</p>
+                </div>
+            `;
+            contador.textContent = '0';
+            document.getElementById('itensJson').value = '[]';
+            return;
+        }
+
+        let html = '';
+        itens.forEach((item, index) => {
+            html += `
+                <div class="item-row" data-id="${item.id}">
+                    <div class="row align-items-center">
+                        <div class="col-md-4 col-8">
+                            <h6 class="mb-1">${item.nome}</h6>
+                            <small class="text-muted">Código: ${item.codigo}</small>
+                        </div>
+                        <!-- NOVA COLUNA PARA OBSERVAÇÃO -->
+                        <div class="col-md-3 col-6">
+                            ${item.observacao ? `
+                                <span class="badge badge-secondary p-2">
+                                    <i class="fas fa-info-circle"></i> ${item.observacao}
+                                </span>
+                            ` : '<small class="text-muted">Sem observação</small>'}
+                        </div>
+                        <div class="col-md-2 col-4 text-center">
+                            <span class="badge badge-info">${item.quantidade} ${item.unidade}</span>
+                        </div>
+                        <div class="col-md-3 col-4 text-right">
+                            <button type="button" class="btn btn-sm btn-outline-primary mr-1" onclick="editarItem(${item.id})" title="Editar item">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-danger" onclick="removerItem(${item.id})" title="Remover item">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+        contador.textContent = itens.length;
+        
+        // Atualizar campo hidden com JSON dos itens
+        document.getElementById('itensJson').value = JSON.stringify(itens);
+    }
+
+    function editarItem(id) {
+        const item = itens.find(i => i.id === id);
+        if (!item) return;
+
+        // Preencher campos com dados do item
+        document.getElementById('novoItem').value = item.codigo;
+        document.getElementById('novaObservacao').value = item.observacao; // PREENCHER OBSERVAÇÃO
+        document.getElementById('novaQuantidade').value = item.quantidade;
+        document.getElementById('novaUnidade').value = item.unidade;
+        
+        // Atualizar select2
+        $('#novoItem').val(item.codigo).trigger('change');
+        
+        // Remover item da lista (será readicionado quando clicar em Adicionar)
+        removerItem(id);
+        
+        // Scroll para o formulário
+        document.getElementById('novoItem').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function removerItem(id) {
+        if (confirm('Deseja remover este item?')) {
+            itens = itens.filter(item => item.id !== id);
+            renderizarItens();
+        }
+    }
+
+    // Restante das funções permanecem iguais...
+    function salvarRascunho() {
+        const dados = coletarDadosFormulario();
+        localStorage.setItem('rascunhoPedido', JSON.stringify(dados));
+        
+        // Feedback visual
+        const btn = event.target;
+        const textoOriginal = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i> Salvo!';
+        btn.disabled = true;
+        
+        setTimeout(() => {
+            btn.innerHTML = textoOriginal;
+            btn.disabled = false;
+        }, 2000);
+    }
+
+    function limparFormulario() {
+        if (confirm('Deseja limpar todos os dados do formulário?')) {
+            document.getElementById('pedidoCompraForm').reset();
+            itens = [];
+            renderizarItens();
+            $('#novoItem, #novaUnidade, #responsavel, #prioridade, #status').val('').trigger('change');
+            document.getElementById('novaObservacao').value = ''; // LIMPAR OBSERVAÇÃO
+        }
+    }
+
+    function coletarDadosFormulario() {
+        return {
+            responsavel: document.getElementById('responsavel').value,
+            prioridade: document.getElementById('prioridade').value,
+            data_necessidade: document.getElementById('data_necessidade').value,
+            status: document.getElementById('status').value,
+            observacoes: document.getElementById('observacoes').value,
+            itens: itens,
+            obra: 'FAGA'
+        };
+    }
+
+    // Submit do formulário
+    document.getElementById('pedidoCompraForm').addEventListener('submit', function(e) {
+        if (itens.length === 0) {
+            e.preventDefault();
+            alert('Adicione pelo menos um item ao pedido.');
+            return false;
+        }
+        
+        // Atualizar campo hidden antes do submit
+        document.getElementById('itensJson').value = JSON.stringify(itens);
+    });
+
+    // Evento de mudança no select de itens para lidar com novo item e sugestão de unidade
+    document.addEventListener('DOMContentLoaded', function() {
+        const selectItem = document.getElementById('novoItem');
+        const novoItemNomeGroup = document.getElementById('novoItemNomeGroup');
+        selectItem.addEventListener('change', function() {
+            const codigoItem = this.value;
+            // Se a opção for "novo", mostra campo para novo item; caso contrário, oculta
+            if (codigoItem === 'novo') {
+                novoItemNomeGroup.style.display = 'block';
+            } else {
+                novoItemNomeGroup.style.display = 'none';
+            }
+            // Sugerir unidade apenas para itens existentes
+            if (codigoItem && codigoItem !== 'novo') {
+                const unidadeSugerida = sugerirUnidade(codigoItem);
+                document.getElementById('novaUnidade').value = unidadeSugerida;
+            }
+        });
+    });
+</script>
+                        <!-- Lista de Itens -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h4 class="section-title">
+                                    <i class="fas fa-list me-2"></i>Itens do Pedido
+                                    <span class="badge badge-primary ml-2" id="contadorItens">0</span>
+                                </h4>
+                            </div>
+                            <div class="col-12">
+                                <div id="listaItens">
+                                    <div class="text-center text-muted p-4">
+                                        <i class="fas fa-box-open fa-3x mb-3"></i>
+                                        <p>Nenhum item adicionado ainda.<br>Use o formulário acima para adicionar itens.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Observações -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h4 class="section-title">
+                                    <i class="fas fa-comment-alt me-2"></i>Observações
+                                </h4>
+                            </div>
+                            <div class="col-12">
+                                <div class="form-group">
+                                    <textarea class="form-control" id="observacoes" name="observacoes" rows="4" 
+                                              placeholder="Observações adicionais...">{% if pedido %}{{ pedido.observacoes }}{% endif %}</textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Campo hidden para itens -->
+                        <input type="hidden" id="itensJson" name="itens" value="[]">
+                        <input type="hidden" name="obra" value="FAGA">
+
+                        <!-- Botões -->
+                        <div class="row">
+                            <div class="col-md-4">
+                                <button type="button" class="btn btn-warning btn-block" onclick="salvarRascunho()">
+                                    <i class="fas fa-save"></i> Salvar Rascunho
+                                </button>
+                            </div>
+                            <div class="col-md-4">
+                                <button type="button" class="btn btn-secondary btn-block" onclick="limparFormulario()">
+                                    <i class="fas fa-eraser"></i> Limpar
+                                </button>
+                            </div>
+                            <div class="col-md-4">
+                                <button type="submit" class="btn btn-primary btn-block">
+                                    <i class="fas fa-paper-plane"></i> 
+                                    {% if pedido %}Atualizar{% else %}Enviar{% endif %} Pedido
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block javascripts %}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+    let itens = [];
+    let contadorItem = 0;
+
+    // Carregar itens existentes se estiver editando
+    {% if pedido and pedido.itens %}
+    itens = [
+        {% for item in pedido.itens %}
+        {
+            id: {{ loop.index }},
+            codigo: "{{ item.codigo_item }}",
+            nome: "{{ item.nome_item }}",
+            quantidade: {{ item.quantidade }},
+            unidade: "{{ item.unidade }}"
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    contadorItem = {{ pedido.itens|length }};
+    {% endif %}
+
+    $(document).ready(function() {
+        // Inicializar Select2
+        $('#novoItem, #novaUnidade, #responsavel, #prioridade, #status').select2({
+            theme: 'classic',
+            width: '100%'
+        });
+
+        // Renderizar itens existentes
+        renderizarItens();
+
+        // Definir data padrão se novo pedido
+        {% if not pedido %}
+        document.getElementById('data_necessidade').valueAsDate = new Date();
+        {% endif %}
+
+        // Exibir/ocultar campo de novo item e sugerir unidades ao selecionar item
+        const selectItem = document.getElementById('novoItem');
+        const novoItemNomeGroup = document.getElementById('novoItemNomeGroup');
+        selectItem.addEventListener('change', function() {
+            const codigoItem = this.value;
+            if (codigoItem === 'novo') {
+                novoItemNomeGroup.style.display = 'block';
+            } else {
+                novoItemNomeGroup.style.display = 'none';
+            }
+            // Sugere a unidade para itens existentes
+            if (codigoItem && codigoItem !== 'novo') {
+                const unidadeSugerida = sugerirUnidade(codigoItem);
+                document.getElementById('novaUnidade').value = unidadeSugerida;
+            }
+        });
+    });
+
+    function sugerirUnidade(codigo) {
+        const unidades = {
+            'cimento': 'sc',
+            'areia': 'm³',
+            'brita': 'm³',
+            'ferro_6mm': 'kg',
+            'ferro_8mm': 'kg',
+            'ferro_10mm': 'kg',
+            'ferro_12mm': 'kg',
+            'bloco_ceramico': 'un',
+            'tijolo_6_furos': 'un',
+            'cal': 'sc',
+            'argamassa': 'sc',
+            'ceramica': 'm²',
+            'tinta_pva': 'gl',
+            'tinta_acrilica': 'gl'
+        };
+        return unidades[codigo] || 'un';
+    }
+
+    // Event listener para sugerir automaticamente a unidade quando o item for selecionado
+
+    function removerItem(id) {
+        if (confirm('Deseja remover este item?')) {
+            itens = itens.filter(item => item.id !== id);
+            renderizarItens();
+        }
+    }
+
+    function salvarRascunho() {
+        const dados = coletarDadosFormulario();
+        localStorage.setItem('rascunhoPedido', JSON.stringify(dados));
+        
+        // Feedback visual
+        const btn = event.target;
+        const textoOriginal = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i> Salvo!';
+        btn.disabled = true;
+        
+        setTimeout(() => {
+            btn.innerHTML = textoOriginal;
+            btn.disabled = false;
+        }, 2000);
+    }
+
+    function limparFormulario() {
+        if (confirm('Deseja limpar todos os dados do formulário?')) {
+            document.getElementById('pedidoCompraForm').reset();
+            itens = [];
+            renderizarItens();
+            $('#novoItem, #novaUnidade, #responsavel, #prioridade, #status').val('').trigger('change');
+        }
+    }
+
+    function coletarDadosFormulario() {
+        return {
+            responsavel: document.getElementById('responsavel').value,
+            prioridade: document.getElementById('prioridade').value,
+            data_necessidade: document.getElementById('data_necessidade').value,
+            status: document.getElementById('status').value,
+            observacoes: document.getElementById('observacoes').value,
+            itens: itens,
+            obra: 'FAGA'
+        };
+    }
+
+    // Submit do formulário
+    document.getElementById('pedidoCompraForm').addEventListener('submit', function(e) {
+        if (itens.length === 0) {
+            e.preventDefault();
+            alert('Adicione pelo menos um item ao pedido.');
+            return false;
+        }
+        
+        // Atualizar campo hidden antes do submit
+        document.getElementById('itensJson').value = JSON.stringify(itens);
+    });
+
+    // Carregar rascunho ao inicializar (se existir e for novo pedido)
+    {% if not pedido %}
+    window.addEventListener('load', function() {
+        const rascunho = localStorage.getItem('rascunhoPedido');
+        if (rascunho && confirm('Deseja carregar o rascunho salvo?')) {
+            const dados = JSON.parse(rascunho);
+            
+            // Preencher campos
+            document.getElementById('responsavel').value = dados.responsavel;
+            document.getElementById('prioridade').value = dados.prioridade;
+            document.getElementById('data_necessidade').value = dados.data_necessidade;
+            document.getElementById('status').value = dados.status;
+            document.getElementById('observacoes').value = dados.observacoes;
+            
+            // Carregar itens
+            itens = dados.itens || [];
+            contadorItem = Math.max(...itens.map(i => i.id), 0);
+            renderizarItens();
+            
+            // Atualizar selects
+            $('#responsavel, #prioridade, #status').trigger('change');
+        }
+    });
+    {% endif %}
+</script>
+{% endblock javascripts %}

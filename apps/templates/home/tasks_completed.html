@@ -1,0 +1,170 @@
+{% extends "layouts/base.html" %}
+
+{% block title %} Tarefas Concluídas {% endblock %}
+
+{% block stylesheets %}
+<style>
+    /* Ajusta a aparência da página de tarefas concluídas para seguir o tema verde e reduzir o espaço. */
+    .header.bg-gradient-primary {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+        padding-top: 1.5rem !important;
+        padding-bottom: 1.5rem !important;
+    }
+    .container-fluid.mt--7 {
+        margin-top: 0 !important;
+    }
+    .h2.text-white.d-inline-block.mb-0 {
+        color: #000 !important;
+    }
+    /* Altera a cor de fundo geral para se alinhar ao tema claro/verdiado utilizado em tarefas */
+    body {
+        background-color: #f8f9fa !important;
+    }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="header bg-gradient-primary pb-8 pt-5 pt-md-8">
+    <div class="container-fluid">
+        <div class="header-body">
+            <div class="row align-items-center">
+                <div class="col-8">
+                    <h6 class="h2 text-white d-inline-block mb-0">Financeiro</h6>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Page content -->
+<div class="container-fluid mt--7">
+    <div class="row">
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table align-items-center table-flush">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th scope="col">Título</th>
+                                    <th scope="col">Concluída em</th>
+                                    <th scope="col">Tempo Gasto</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for task in completadas %}
+<tr class="completed-task-row"
+                                    data-id="{{ task.id }}"
+                                    data-title="{{ task.title }}"
+                                    data-description="{{ task.description }}"
+                                    data-observations="{{ task.observations }}"
+                                    data-priority="{{ task.priority }}"
+                                    data-assignee="{{ task.assignee }}"
+                                    data-due-date="{{ task.due_date.isoformat() if task.due_date else '' }}"
+                                    data-status="{{ task.status }}"
+                                    data-data-criacao="{{ task.data_criacao.isoformat() if task.data_criacao else '' }}"
+                                    data-data-conclusao="{{ task.data_conclusao.isoformat() if task.data_conclusao else '' }}"
+                                    data-duration="{{ task.duration_display }}"
+                                    data-attachment-path="{{ task.attachment_path if task.attachment_path else '' }}">
+                                    <th scope="row">{{ task.title }}</th>
+                                    <td>{{ task.data_conclusao.strftime('%d/%m/%Y %H:%M') if task.data_conclusao else '' }}</td>
+                                    <td>{{ task.duration_display }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal detalhes de tarefa concluída -->
+    <div class="modal fade" id="completedTaskModal" tabindex="-1" role="dialog" aria-labelledby="completedTaskModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="completedTaskModalLabel">Detalhes da Tarefa Concluída</h5>
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Título:</strong> <span id="comp-title"></span></p>
+                    <p><strong>Descrição:</strong> <span id="comp-description"></span></p>
+                    <p><strong>Observações:</strong> <span id="comp-observations"></span></p>
+                    <p><strong>Prioridade:</strong> <span id="comp-priority"></span></p>
+                    <p><strong>Responsável:</strong> <span id="comp-assignee"></span></p>
+                    <p><strong>Data de Vencimento:</strong> <span id="comp-due-date"></span></p>
+                    <p><strong>Status:</strong> <span id="comp-status"></span></p>
+                    <p><strong>Data de Criação:</strong> <span id="comp-data-criacao"></span></p>
+                    <p><strong>Concluída em:</strong> <span id="comp-data-conclusao"></span></p>
+                    <p><strong>Tempo Gasto:</strong> <span id="comp-duration"></span></p>
+        <p><strong>Anexo:</strong> <span id="comp-attachment"></span></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block javascripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.completed-task-row').forEach(function(row) {
+        row.addEventListener('click', function() {
+            document.getElementById('comp-title').textContent = this.getAttribute('data-title') || '';
+            document.getElementById('comp-description').textContent = this.getAttribute('data-description') || '';
+            document.getElementById('comp-observations').textContent = this.getAttribute('data-observations') || '';
+            document.getElementById('comp-priority').textContent = this.getAttribute('data-priority') || '';
+            document.getElementById('comp-assignee').textContent = this.getAttribute('data-assignee') || '';
+            const dueDate = this.getAttribute('data-due-date') || '';
+            if (dueDate) {
+                const dateObj = new Date(dueDate);
+                document.getElementById('comp-due-date').textContent = dateObj.toLocaleDateString('pt-BR');
+            } else {
+                document.getElementById('comp-due-date').textContent = '';
+            }
+            document.getElementById('comp-status').textContent = this.getAttribute('data-status') || '';
+            const dataCriacao = this.getAttribute('data-data-criacao');
+            if (dataCriacao) {
+                const dateObj = new Date(dataCriacao);
+                document.getElementById('comp-data-criacao').textContent = dateObj.toLocaleString('pt-BR');
+            } else {
+                document.getElementById('comp-data-criacao').textContent = '';
+            }
+            const dataConclusao = this.getAttribute('data-data-conclusao');
+            if (dataConclusao) {
+                const dateObj = new Date(dataConclusao);
+                document.getElementById('comp-data-conclusao').textContent = dateObj.toLocaleString('pt-BR');
+            } else {
+                document.getElementById('comp-data-conclusao').textContent = '';
+            }
+            document.getElementById('comp-duration').textContent = this.getAttribute('data-duration') || '';
+            // Trata o anexo: exibe link se existir
+            const attachmentPath = this.getAttribute('data-attachment-path') || '';
+            const attachmentContainer = document.getElementById('comp-attachment');
+            // Limpa o conteúdo anterior
+            attachmentContainer.textContent = '';
+            if (attachmentPath) {
+                const link = document.createElement('a');
+                link.href = '/uploads/' + encodeURIComponent(attachmentPath);
+                link.textContent = 'Download';
+                link.target = '_blank';
+                attachmentContainer.appendChild(link);
+            } else {
+                attachmentContainer.textContent = 'Nenhum';
+            }
+            // Exibe o modal
+            $('#completedTaskModal').modal('show');
+        });
+    });
+});
+</script>
+{% endblock %}
