@@ -6,6 +6,7 @@ Copyright (c) 2019 - present AppSeed.us
 from apps.home import blueprint
 
 import csv
+import io
 import json
 import os
 import re
@@ -15,8 +16,9 @@ from decimal import Decimal, InvalidOperation
 from flask import abort, flash, jsonify, redirect, render_template, request, send_file, send_from_directory, url_for
 from flask_login import current_user, login_required
 from jinja2 import TemplateNotFound
+from sqlalchemy import inspect
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from werkzeug.utils import secure_filename
-import io
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
@@ -37,6 +39,34 @@ from apps.authentication.models import (
 DATA_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'data'))
 FORNECEDORES_CSV = os.path.join(DATA_FOLDER, 'fornecedores.csv')
 os.makedirs(DATA_FOLDER, exist_ok=True)
+
+
+def obras_feature_enabled():
+    """Check if the optional 'obras' table exists and can be queried."""
+    try:
+        inspector = inspect(db.engine)
+        if not inspector.has_table('obras'):
+            return False
+        return True
+    except (OperationalError, ProgrammingError):
+        db.session.rollback()
+        return False
+
+
+def safe_obras_list(usuario_id):
+    """Return the obras for the user when the feature is available."""
+    if not obras_feature_enabled():
+        return [], False
+    try:
+        obras = (Obra.query
+                 .filter_by(usuario_id=usuario_id)
+                 .order_by(Obra.nome)
+                 .all())
+        return obras, True
+    except (OperationalError, ProgrammingError):
+        db.session.rollback()
+        return [], False
+
 
 def _normalize_cell(value):
     return value.strip() if isinstance(value, str) else ''
@@ -227,28 +257,43 @@ def pedidos_compra():
 @login_required
 def novo_pedido_compra():
     """Formulário para novo pedido de compra"""
-    obras = (Obra.query
-             .filter_by(usuario_id=current_user.id)
-             .order_by(Obra.nome)
-             .all())
-    return render_template('home/pedido_compra_form.html', obras=obras, segment='pedidos')
+    obras, obras_enabled = safe_obras_list(current_user.id)
+    return render_template(
+        'home/pedido_compra_form.html',
+        obras=obras,
+        obras_enabled=obras_enabled,
+        obra_nome_padrao='FAGA',
+        segment='pedidos'
+    )
 
 @blueprint.route('/pedidos-compra/criar', methods=['POST'])
 @login_required
 def criar_pedido_compra():
     """Cria um novo pedido de compra"""
     try:
-        # Criar o pedido
-        obra_id_raw = request.form.get('obra_id')
-        if not obra_id_raw:
-            raise ValueError('Selecione uma obra válida.')
-        try:
-            obra_id = int(obra_id_raw)
-        except (TypeError, ValueError):
-            raise ValueError('Obra selecionada é inválida.')
-        obra = Obra.query.filter_by(id=obra_id, usuario_id=current_user.id).first()
-        if not obra:
-            raise ValueError('Obra selecionada não encontrada.')
+        use_obras = obras_feature_enabled()
+
+        if use_obras:
+            obra_id_raw = request.form.get('obra_id')
+            if not obra_id_raw:
+                raise ValueError('Selecione uma obra válida.')
+            try:
+                obra_id = int(obra_id_raw)
+            except (TypeError, ValueError):
+                raise ValueError('Obra selecionada é inválida.')
+            obra = Obra.query.filter_by(id=obra_id, usuario_id=current_user.id).first()
+            if not obra:
+                raise ValueError('Obra selecionada não encontrada.')
+
+            obra_nome = obra.nome
+            obra_id_final = obra.id
+            obra_endereco = obra.endereco
+        else:
+            obra_nome = (request.form.get('obra_nome_manual') or request.form.get('obra') or 'FAGA').strip()
+            if not obra_nome:
+                obra_nome = 'FAGA'
+            obra_id_final = None
+            obra_endereco = request.form.get('obra_endereco_manual', '').strip() or None
 
         data_necessidade_str = request.form.get('data_necessidade')
         if not data_necessidade_str:
@@ -257,9 +302,9 @@ def criar_pedido_compra():
         data_necessidade = datetime.strptime(data_necessidade_str, '%Y-%m-%d').date()
 
         pedido = PedidoCompra(
-            obra=obra.nome,
-            obra_id=obra.id,
-            obra_endereco=obra.endereco,
+            obra=obra_nome,
+            obra_id=obra_id_final,
+            obra_endereco=obra_endereco,
             responsavel=request.form.get('responsavel'),
             prioridade=request.form.get('prioridade'),
             data_necessidade=data_necessidade,
@@ -267,40 +312,48 @@ def criar_pedido_compra():
             observacoes=request.form.get('observacoes', ''),
             usuario_id=current_user.id
         )
-        
+
         db.session.add(pedido)
         db.session.flush()  # Para obter o ID
-        
-        # Adicionar itens
+
         itens_json = request.form.get('itens', '[]')
         itens = json.loads(itens_json)
-        
+
         for item_data in itens:
             item = ItemPedido(
                 pedido_id=pedido.id,
                 codigo_item=item_data['codigo'],
                 nome_item=item_data['nome'],
-                observacao=item_data.get('observacao', ''),  # NOVO CAMPO
+                observacao=item_data.get('observacao', ''),
                 quantidade=float(item_data['quantidade']),
                 unidade=item_data['unidade']
             )
             db.session.add(item)
-        
+
         db.session.commit()
         flash('Pedido de compra criado com sucesso!', 'success')
         return redirect(url_for('home_blueprint.pedidos_compra'))
-        
+
     except Exception as e:
         db.session.rollback()
         flash(f'Erro ao criar pedido: {str(e)}', 'error')
         return redirect(url_for('home_blueprint.novo_pedido_compra'))
-    
+
+
 @blueprint.route('/pedidos-compra/<int:pedido_id>')
 @login_required
 def ver_pedido_compra(pedido_id):
     """Visualiza um pedido específico"""
     pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
-    return render_template('home/pedido_compra_detalhes.html', pedido=pedido, segment='pedidos')
+    dias_decorridos = None
+    if pedido.data_criacao:
+        try:
+            dias_decorridos = (datetime.utcnow().date() - pedido.data_criacao.date()).days
+        except AttributeError:
+            dias_decorridos = None
+    if dias_decorridos is not None and dias_decorridos < 0:
+        dias_decorridos = 0
+    return render_template('home/pedido_compra_detalhes.html', pedido=pedido, dias_decorridos=dias_decorridos, segment='pedidos')
 
 @blueprint.route('/pedidos-compra/<int:pedido_id>/pdf')
 @login_required
@@ -380,13 +433,34 @@ def pedido_compra_pdf(pedido_id):
 @blueprint.route('/pedidos-compra/<int:pedido_id>/editar')
 @login_required
 def editar_pedido_compra(pedido_id):
+
     """Edita um pedido de compra"""
+
     pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
-    obras = (Obra.query
-             .filter_by(usuario_id=current_user.id)
-             .order_by(Obra.nome)
-             .all())
-    return render_template('home/pedido_compra_form.html', pedido=pedido, obras=obras, obra_atual=pedido.obra_rel, segment='pedidos')
+
+    obras, obras_enabled = safe_obras_list(current_user.id)
+
+    return render_template(
+
+        'home/pedido_compra_form.html',
+
+        pedido=pedido,
+
+        obras=obras,
+
+        obras_enabled=obras_enabled,
+
+        obra_atual=pedido.obra_rel,
+
+        obra_nome_padrao=pedido.obra or 'FAGA',
+
+        segment='pedidos'
+
+    )
+
+
+
+
 
 @blueprint.route('/pedidos-compra/<int:pedido_id>/atualizar', methods=['POST'])
 @login_required
@@ -394,20 +468,30 @@ def atualizar_pedido_compra(pedido_id):
     """Atualiza um pedido de compra"""
     try:
         pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
-        obra_id_raw = request.form.get('obra_id')
-        if not obra_id_raw:
-            raise ValueError('Selecione uma obra válida.')
-        try:
-            obra_id = int(obra_id_raw)
-        except (TypeError, ValueError):
-            raise ValueError('Obra selecionada é inválida.')
-        obra = Obra.query.filter_by(id=obra_id, usuario_id=current_user.id).first()
-        if not obra:
-            raise ValueError('Obra selecionada não encontrada.')
-        
-        pedido.obra = obra.nome
-        pedido.obra_id = obra.id
-        pedido.obra_endereco = obra.endereco
+        use_obras = obras_feature_enabled()
+
+        if use_obras:
+            obra_id_raw = request.form.get('obra_id')
+            if not obra_id_raw:
+                raise ValueError('Selecione uma obra válida.')
+            try:
+                obra_id = int(obra_id_raw)
+            except (TypeError, ValueError):
+                raise ValueError('Obra selecionada é inválida.')
+            obra = Obra.query.filter_by(id=obra_id, usuario_id=current_user.id).first()
+            if not obra:
+                raise ValueError('Obra selecionada não encontrada.')
+
+            pedido.obra = obra.nome
+            pedido.obra_id = obra.id
+            pedido.obra_endereco = obra.endereco
+        else:
+            obra_nome = (request.form.get('obra_nome_manual') or request.form.get('obra') or pedido.obra or 'FAGA').strip()
+            pedido.obra = obra_nome or 'FAGA'
+            pedido.obra_id = None
+            manual_endereco = request.form.get('obra_endereco_manual', '').strip()
+            if manual_endereco:
+                pedido.obra_endereco = manual_endereco
 
         # Atualizar dados do pedido
         pedido.responsavel = request.form.get('responsavel')
@@ -415,52 +499,65 @@ def atualizar_pedido_compra(pedido_id):
         pedido.data_necessidade = datetime.strptime(request.form.get('data_necessidade'), '%Y-%m-%d').date()
         pedido.status = request.form.get('status')
         pedido.observacoes = request.form.get('observacoes', '')
-        
+
         # Remover itens existentes
         ItemPedido.query.filter_by(pedido_id=pedido.id).delete()
-        
+
         # Adicionar novos itens
         itens_json = request.form.get('itens', '[]')
         itens = json.loads(itens_json)
-        
+
         for item_data in itens:
             item = ItemPedido(
                 pedido_id=pedido.id,
                 codigo_item=item_data['codigo'],
                 nome_item=item_data['nome'],
-                observacao=item_data.get('observacao', ''),  # NOVO CAMPO
+                observacao=item_data.get('observacao', ''),
                 quantidade=float(item_data['quantidade']),
                 unidade=item_data['unidade']
             )
             db.session.add(item)
-        
+
         db.session.commit()
         flash('Pedido atualizado com sucesso!', 'success')
         return redirect(url_for('home_blueprint.ver_pedido_compra', pedido_id=pedido.id))
-        
+
     except Exception as e:
         db.session.rollback()
         flash(f'Erro ao atualizar pedido: {str(e)}', 'error')
         return redirect(url_for('home_blueprint.editar_pedido_compra', pedido_id=pedido_id))
+
 
 @blueprint.route('/api/pedidos-compra', methods=['POST'])
 @login_required
 def api_criar_pedido():
     """API endpoint para criar pedido via AJAX"""
     try:
-        dados = request.get_json()
-        
-        # Criar o pedido
-        obra_id_raw = dados.get('obra_id')
-        if not obra_id_raw:
-            raise ValueError('Selecione uma obra válida.')
-        try:
-            obra_id = int(obra_id_raw)
-        except (TypeError, ValueError):
-            raise ValueError('Obra selecionada é inválida.')
-        obra = Obra.query.filter_by(id=obra_id, usuario_id=current_user.id).first()
-        if not obra:
-            raise ValueError('Obra selecionada não encontrada.')
+        dados = request.get_json() or {}
+
+        use_obras = obras_feature_enabled()
+
+        if use_obras:
+            obra_id_raw = dados.get('obra_id')
+            if not obra_id_raw:
+                raise ValueError('Selecione uma obra válida.')
+            try:
+                obra_id = int(obra_id_raw)
+            except (TypeError, ValueError):
+                raise ValueError('Obra selecionada é inválida.')
+            obra = Obra.query.filter_by(id=obra_id, usuario_id=current_user.id).first()
+            if not obra:
+                raise ValueError('Obra selecionada não encontrada.')
+
+            obra_nome = obra.nome
+            obra_id_final = obra.id
+            obra_endereco = obra.endereco
+        else:
+            obra_nome = (dados.get('obra_nome') or dados.get('obra') or 'FAGA').strip()
+            if not obra_nome:
+                obra_nome = 'FAGA'
+            obra_id_final = None
+            obra_endereco = (dados.get('obra_endereco') or '').strip() or None
 
         data_necessidade_str = dados.get('dataNecessidade')
         if not data_necessidade_str:
@@ -468,9 +565,9 @@ def api_criar_pedido():
         data_necessidade = datetime.strptime(data_necessidade_str, '%Y-%m-%d').date()
 
         pedido = PedidoCompra(
-            obra=obra.nome,
-            obra_id=obra.id,
-            obra_endereco=obra.endereco,
+            obra=obra_nome,
+            obra_id=obra_id_final,
+            obra_endereco=obra_endereco,
             responsavel=dados['responsavel'],
             prioridade=dados['prioridade'],
             data_necessidade=data_necessidade,
@@ -478,34 +575,29 @@ def api_criar_pedido():
             observacoes=dados.get('observacoes', ''),
             usuario_id=current_user.id
         )
-        
+
         db.session.add(pedido)
         db.session.flush()
-        
-        # Adicionar itens
-        for item_data in dados['itens']:
+
+        itens = dados.get('itens', [])
+        for item_data in itens:
             item = ItemPedido(
                 pedido_id=pedido.id,
                 codigo_item=item_data['codigo'],
                 nome_item=item_data['nome'],
-                observacao=item_data.get('observacao', ''),  # NOVO CAMPO
+                observacao=item_data.get('observacao', ''),
                 quantidade=float(item_data['quantidade']),
                 unidade=item_data['unidade']
             )
             db.session.add(item)
-        
+
         db.session.commit()
-        
-        return {'success': True, 'message': 'Pedido criado com sucesso!', 'pedido_id': pedido.id}
-        
+        return jsonify({'success': True, 'pedido_id': pedido.id})
+
     except Exception as e:
         db.session.rollback()
-        return {'success': False, 'message': f'Erro: {str(e)}'}, 400
+        return jsonify({'success': False, 'message': str(e)}), 400
 
-
-# -----------------------------------------------------------------------------
-# API de Tarefas
-# Endpoints para criar e atualizar tarefas no painel Kanban de tarefas.
 
 @blueprint.route('/api/tasks', methods=['POST'])
 @login_required
@@ -513,7 +605,6 @@ def api_create_task():
     """Cria uma nova tarefa via requisição AJAX."""
     try:
         data = request.get_json() or {}
-        # Parse campos básicos
         title = data.get('title')
         if not title:
             return jsonify({'success': False, 'message': 'Título é obrigatório'}), 400
@@ -529,7 +620,6 @@ def api_create_task():
                 return jsonify({'success': False, 'message': 'Data de vencimento inválida'}), 400
         else:
             due_date = None
-        # Determine a posição inicial (fim da coluna "Pendente")
         posicao = data.get('posicao', 0)
         nova_tarefa = Task(
             title=title,

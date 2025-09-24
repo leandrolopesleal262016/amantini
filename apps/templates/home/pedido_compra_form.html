@@ -200,6 +200,7 @@
                                     </select>
                                 </div>
                             </div>
+                            {% if obras_enabled %}
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label class="form-control-label" for="obra_id">Obra</label>
@@ -209,7 +210,7 @@
                                             {% for obra in obras or [] %}
                                             <option value="{{ obra.id }}" data-endereco="{{ obra.endereco or '' }}" {% if pedido and pedido.obra_id == obra.id %}selected{% endif %}>{{ obra.nome }}</option>
                                             {% endfor %}
-                                            <option value="novo">Cadastrar nova obraâ€¦</option>
+                                            <option value="novo">Cadastrar nova obra…</option>
                                         </select>
                                         <button type="button" class="btn btn-outline-success ml-2" data-toggle="modal" data-target="#novaObraModal">
                                             <i class="fas fa-plus"></i>
@@ -227,11 +228,27 @@
                                         {% if endereco_atual %}
                                             <i class="fas fa-map-marker-alt mr-1 text-success"></i>{{ endereco_atual }}
                                         {% else %}
-                                            Informe ou cadastre uma obra para exibir o endereÃ§o.
+                                            Informe ou cadastre uma obra para exibir o endereço.
                                         {% endif %}
                                     </small>
                                 </div>
                             </div>
+                            {% else %}
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-control-label" for="obra_nome_manual">Obra</label>
+                                    <input type="text" class="form-control" id="obra_nome_manual" name="obra_nome_manual" value="{% if pedido %}{{ pedido.obra }}{% else %}{{ obra_nome_padrao }}{% endif %}" required>
+                                    <small class="form-text text-muted">Informe o nome da obra ou projeto.</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-control-label" for="obra_endereco_manual">Endereço da obra</label>
+                                    <textarea class="form-control" id="obra_endereco_manual" name="obra_endereco_manual" rows="2" placeholder="Rua, número, bairro, cidade...">{% if pedido and pedido.obra_endereco %}{{ pedido.obra_endereco }}{% endif %}</textarea>
+                                    <small class="form-text text-muted">Campo opcional para facilitar a logística.</small>
+                                </div>
+                            </div>
+                            {% endif %}
                             <div class="col-md-3">
                                 <div class="form-group">
                                     <label class="form-control-label" for="prioridade">Prioridade</label>
@@ -348,7 +365,7 @@
     </div>
 </div>
 
-</script>
+
                         <!-- Lista de Itens -->
                         <div class="row mb-4">
                             <div class="col-12">
@@ -411,6 +428,7 @@
     </div>
 </div>
 
+{% if obras_enabled %}
 <!-- Modal: Nova Obra -->
 <div class="modal fade" id="novaObraModal" tabindex="-1" role="dialog" aria-labelledby="novaObraModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" role="document">
@@ -440,6 +458,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 {% endblock content %}
 
 {% block javascripts %}
@@ -449,12 +468,19 @@
     let itens = [];
     let contadorItem = 0;
 
-    const obraSelect = document.getElementById('obra_id');
-    const obraEnderecoText = document.getElementById('obra-endereco-text');
-    const novaObraForm = document.getElementById('novaObraForm');
+    const obrasEnabled = {{ 'true' if obras_enabled else 'false' }};
+    const obraSelect = obrasEnabled ? document.getElementById('obra_id') : null;
+    const obraNomeManual = obrasEnabled ? null : document.getElementById('obra_nome_manual');
+    const obraEnderecoManual = obrasEnabled ? null : document.getElementById('obra_endereco_manual');
+    const obraEnderecoText = obrasEnabled ? document.getElementById('obra-endereco-text') : null;
+    const novaObraForm = obrasEnabled ? document.getElementById('novaObraForm') : null;
+    const obraNomePadrao = {{ (obra_nome_padrao or '') | tojson }};
     let lastObraValue = obraSelect ? obraSelect.value : '';
 
     function atualizarEnderecoObra() {
+        if (!obrasEnabled) {
+            return;
+        }
         if (!obraSelect || !obraEnderecoText) {
             return;
         }
@@ -471,13 +497,14 @@
     {% if pedido and pedido.itens %}
     itens = [
         {% for item in pedido.itens %}
-        {
-            id: {{ loop.index }},
-            codigo: "{{ item.codigo_item }}",
-            nome: "{{ item.nome_item }}",
-            quantidade: {{ item.quantidade }},
-            unidade: "{{ item.unidade }}"
-        }{% if not loop.last %},{% endif %}
+        {{ {
+            'id': loop.index,
+            'codigo': item.codigo_item or '',
+            'nome': item.nome_item or '',
+            'observacao': item.observacao or '',
+            'quantidade': (item.quantidade or 0)|float,
+            'unidade': item.unidade or ''
+        } | tojson }}{% if not loop.last %},{% endif %}
         {% endfor %}
     ];
     contadorItem = {{ pedido.itens|length }};
@@ -485,7 +512,11 @@
 
     $(document).ready(function() {
         // Inicializar Select2
-        $('#novoItem, #novaUnidade, #responsavel, #prioridade, #status, #obra_id').select2({
+        const select2Targets = ['#novoItem', '#novaUnidade', '#responsavel', '#prioridade', '#status'];
+        if (obrasEnabled) {
+            select2Targets.push('#obra_id');
+        }
+        $(select2Targets.join(', ')).select2({
             theme: 'classic',
             width: '100%'
         });
@@ -606,6 +637,159 @@
         return unidades[codigo] || 'un';
     }
 
+    function escapeHtml(value) {
+        if (value === undefined || value === null) {
+            return '';
+        }
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function formatQuantidade(value) {
+        const numero = Number(value);
+        if (Number.isNaN(numero)) {
+            return '0';
+        }
+        return numero.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    }
+
+    function renderizarItens() {
+        const lista = document.getElementById('listaItens');
+        const contador = document.getElementById('contadorItens');
+        const itensJsonInput = document.getElementById('itensJson');
+
+        if (contador) {
+            contador.textContent = itens.length;
+        }
+        if (itensJsonInput) {
+            itensJsonInput.value = JSON.stringify(itens);
+        }
+        if (!lista) {
+            return;
+        }
+
+        if (!itens.length) {
+            lista.innerHTML = `
+                <div class="text-center text-muted p-4">
+                    <i class="fas fa-box-open fa-3x mb-3"></i>
+                    <p>Nenhum item adicionado ainda.<br>Use o formulário acima para adicionar itens.</p>
+                </div>
+            `;
+            return;
+        }
+
+        const rows = itens.map((item) => {
+            const codigo = item.codigo ? `<span class="text-sm text-muted d-block">Código: ${escapeHtml(item.codigo)}</span>` : '';
+            const observacao = item.observacao ? `<span class="text-sm d-block"><strong>Obs:</strong> ${escapeHtml(item.observacao)}</span>` : '';
+            const quantidade = formatQuantidade(item.quantidade);
+            return `
+                <div class="item-row mb-3" data-item-id="${item.id}">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <span class="font-weight-bold d-block">${escapeHtml(item.nome)}</span>
+                            ${codigo}
+                            ${observacao}
+                        </div>
+                        <div class="col-md-3 text-md-right mt-3 mt-md-0">
+                            <span class="badge badge-pill badge-primary">${quantidade} ${escapeHtml(item.unidade)}</span>
+                        </div>
+                        <div class="col-md-3 text-md-right mt-3 mt-md-0">
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerItem(${item.id})">
+                                <i class="fas fa-trash-alt"></i> Remover
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        lista.innerHTML = rows;
+    }
+
+    function adicionarItem() {
+        const selectItem = document.getElementById('novoItem');
+        const novoItemNomeGroup = document.getElementById('novoItemNomeGroup');
+        const novoItemNome = document.getElementById('novoItemNome');
+        const observacaoInput = document.getElementById('novaObservacao');
+        const quantidadeInput = document.getElementById('novaQuantidade');
+        const unidadeSelect = document.getElementById('novaUnidade');
+
+        if (!selectItem) {
+            return;
+        }
+
+        const codigoSelecionado = selectItem.value;
+        if (!codigoSelecionado) {
+            alert('Selecione um item da lista ou informe um novo item.');
+            selectItem.focus();
+            return;
+        }
+
+        const ehNovoItem = codigoSelecionado === 'novo';
+        let nomeFinal = '';
+        if (ehNovoItem) {
+            nomeFinal = novoItemNome ? novoItemNome.value.trim() : '';
+            if (!nomeFinal) {
+                alert('Informe o nome do novo item.');
+                if (novoItemNome) {
+                    novoItemNome.focus();
+                }
+                return;
+            }
+        } else {
+            const option = selectItem.options[selectItem.selectedIndex];
+            nomeFinal = option ? option.text.trim() : '';
+        }
+
+        const quantidadeValor = quantidadeInput ? quantidadeInput.value.replace(',', '.') : '';
+        const quantidade = parseFloat(quantidadeValor);
+        if (!quantidade || quantidade <= 0) {
+            alert('Informe uma quantidade válida.');
+            if (quantidadeInput) {
+                quantidadeInput.focus();
+            }
+            return;
+        }
+
+        const unidade = unidadeSelect ? unidadeSelect.value : 'un';
+        const observacao = observacaoInput ? observacaoInput.value.trim() : '';
+        const codigoFinal = ehNovoItem ? nomeFinal : codigoSelecionado;
+
+        contadorItem += 1;
+        itens.push({
+            id: contadorItem,
+            codigo: codigoFinal,
+            nome: nomeFinal,
+            observacao: observacao,
+            quantidade: quantidade,
+            unidade: unidade
+        });
+
+        renderizarItens();
+
+        if (observacaoInput) {
+            observacaoInput.value = '';
+        }
+        if (quantidadeInput) {
+            quantidadeInput.value = '';
+        }
+        if (unidadeSelect) {
+            unidadeSelect.value = 'un';
+        }
+        if (novoItemNome) {
+            novoItemNome.value = '';
+        }
+        if (novoItemNomeGroup) {
+            novoItemNomeGroup.style.display = 'none';
+        }
+
+        $('#novoItem').val('').trigger('change');
+        selectItem.focus();
+    }
+
     // Event listener para sugerir automaticamente a unidade quando o item for selecionado
 
     function removerItem(id) {
@@ -636,32 +820,51 @@
             document.getElementById('pedidoCompraForm').reset();
             itens = [];
             renderizarItens();
-            $('#novoItem, #novaUnidade, #responsavel, #prioridade, #status, #obra_id').val('').trigger('change');
+            const selectors = ['#novoItem', '#novaUnidade', '#responsavel', '#prioridade', '#status'];
+            if (obrasEnabled) {
+                selectors.push('#obra_id');
+            }
+            $(selectors.join(', ')).val('').trigger('change');
             const observacaoEl = document.getElementById('novaObservacao');
             if (observacaoEl) {
                 observacaoEl.value = '';
             }
-            if (obraSelect) {
-                lastObraValue = '';
-                atualizarEnderecoObra();
+            if (obrasEnabled) {
+                if (obraSelect) {
+                    lastObraValue = '';
+                    atualizarEnderecoObra();
+                }
+            } else {
+                if (obraNomeManual) {
+                    obraNomeManual.value = obraNomePadrao || '';
+                }
+                if (obraEnderecoManual) {
+                    obraEnderecoManual.value = '';
+                }
             }
         }
     }
 
     function coletarDadosFormulario() {
-        const obraSelect = document.getElementById('obra_id');
-        const selectedOption = obraSelect ? obraSelect.options[obraSelect.selectedIndex] : null;
-        return {
+        const data = {
             responsavel: document.getElementById('responsavel').value,
             prioridade: document.getElementById('prioridade').value,
             data_necessidade: document.getElementById('data_necessidade').value,
             status: document.getElementById('status').value,
             observacoes: document.getElementById('observacoes').value,
-            itens: itens,
-            obra_id: obraSelect ? obraSelect.value : '',
-            obra_nome: selectedOption ? (selectedOption.text || '') : '',
-            obra_endereco: selectedOption ? (selectedOption.getAttribute('data-endereco') || '') : ''
+            itens: itens
         };
+        if (obrasEnabled && obraSelect) {
+            const selectedOption = obraSelect.options[obraSelect.selectedIndex];
+            data.obra_id = obraSelect.value;
+            data.obra_nome = selectedOption ? (selectedOption.text || '') : '';
+            data.obra_endereco = selectedOption ? (selectedOption.getAttribute('data-endereco') || '') : '';
+        } else {
+            data.obra_id = '';
+            data.obra_nome = obraNomeManual ? obraNomeManual.value : '';
+            data.obra_endereco = obraEnderecoManual ? obraEnderecoManual.value : '';
+        }
+        return data;
     }
 
     // Submit do formulÃ¡rio
@@ -671,13 +874,22 @@
             alert('Adicione pelo menos um item ao pedido.');
             return false;
         }
-        if (!obraSelect || !obraSelect.value || obraSelect.value === 'novo') {
-            e.preventDefault();
-            alert('Selecione uma obra válida.');
-            return false;
+
+        if (obrasEnabled) {
+            if (!obraSelect || !obraSelect.value || obraSelect.value === 'novo') {
+                e.preventDefault();
+                alert('Selecione uma obra válida.');
+                return false;
+            }
+            lastObraValue = obraSelect.value;
+            atualizarEnderecoObra();
+        } else {
+            if (!obraNomeManual || !obraNomeManual.value.trim()) {
+                e.preventDefault();
+                alert('Informe o nome da obra.');
+                return false;
+            }
         }
-        lastObraValue = obraSelect.value;
-        atualizarEnderecoObra();
 
         // Atualizar campo hidden antes do submit
         document.getElementById('itensJson').value = JSON.stringify(itens);
@@ -697,7 +909,7 @@
             document.getElementById('status').value = dados.status;
             document.getElementById('observacoes').value = dados.observacoes;
 
-            if (obraSelect && dados.obra_id) {
+            if (obrasEnabled && obraSelect && dados.obra_id) {
                 const valor = String(dados.obra_id);
                 let option = Array.from(obraSelect.options).find(opt => opt.value === valor);
                 if (!option && dados.obra_nome) {
@@ -712,6 +924,12 @@
                 lastObraValue = valor;
                 atualizarEnderecoObra();
             } else {
+                if (!obrasEnabled && obraNomeManual) {
+                    obraNomeManual.value = dados.obra_nome || obraNomePadrao || '';
+                }
+                if (!obrasEnabled && obraEnderecoManual) {
+                    obraEnderecoManual.value = dados.obra_endereco || '';
+                }
                 atualizarEnderecoObra();
             }
 
@@ -721,8 +939,12 @@
             renderizarItens();
 
             // Atualizar selects
-            $('#responsavel, #prioridade, #status, #obra_id').trigger('change');
-        } else {
+            const selectsToTrigger = ['#responsavel', '#prioridade', '#status'];
+            if (obrasEnabled && obraSelect) {
+                selectsToTrigger.push('#obra_id');
+            }
+            $(selectsToTrigger.join(', ')).trigger('change');
+        } else if (obrasEnabled) {
             atualizarEnderecoObra();
         }
     });

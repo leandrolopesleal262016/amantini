@@ -4,7 +4,7 @@
 
 {% block stylesheets %}
 <style>
-    /* Adapta a aparÃªncia da pÃ¡gina de compras para seguir o tema claro/verde. */
+    /* Adapta a aparência da página de compras para seguir o tema claro/verde. */
     .header.bg-gradient-primary {
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
         padding-top: 1.5rem !important;
@@ -33,9 +33,9 @@
                     <h6 class="h2 d-inline-block mb-0 header-title">Compras</h6>
                 </div>
                 <div class="col-lg-6 col-5 text-right">
-                    <!-- BotÃ£o renomeado para "Novo OrÃ§amento" seguindo a nomenclatura solicitada -->
+                    <!-- Botão renomeado para "Novo Orçamento" seguindo a nomenclatura solicitada -->
                     <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#newCompraModal">
-                        <i class="ni ni-fat-add"></i> Novo OrÃ§amento
+                        <i class="ni ni-fat-add"></i> Novo Orçamento
                     </button>
                 </div>
             </div>
@@ -55,8 +55,8 @@
                                 <tr>
                                     <th scope="col">Fornecedor</th>
                                     <th scope="col">Valor</th>
-                                    <!-- Mostra a data do orÃ§amento ou, em falta, a data de criaÃ§Ã£o -->
-                                    <th scope="col">Data do OrÃ§amento</th>
+                                    <!-- Mostra a data do orçamento ou, em falta, a data de criação -->
+                                    <th scope="col">Data do Orçamento</th>
                                     <th scope="col">Anexo</th>
                                 </tr>
                             </thead>
@@ -66,7 +66,7 @@
                                     <th scope="row">{{ compra.fornecedor.nome }}</th>
                                     <td>R$ {{ '%.2f' | format(compra.valor) }}</td>
                                     <td>
-                                        {# Exibe data_orcamento se existir, caso contrÃ¡rio data_criacao #}
+                                        {# Exibe data_orcamento se existir, caso contrário data_criacao #}
                                         {% if compra.data_orcamento %}
                                             {{ compra.data_orcamento.strftime('%d/%m/%Y') }}
                                         {% else %}
@@ -94,8 +94,8 @@
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <!-- TÃ­tulo atualizado para refletir a criaÃ§Ã£o de um novo orÃ§amento -->
-                    <h5 class="modal-title" id="newCompraModalLabel">Novo OrÃ§amento</h5>
+                    <!-- Título atualizado para refletir a criação de um novo orçamento -->
+                    <h5 class="modal-title" id="newCompraModalLabel">Novo Orçamento</h5>
                     <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
@@ -108,10 +108,10 @@
                                 {% for fornecedor in fornecedores %}
                                     <option value="{{ fornecedor.id }}">{{ fornecedor.nome_fantasia or fornecedor.nome }}</option>
                                 {% endfor %}
-                                <option value="novo">Incluir novo fornecedorâ€¦</option>
+                                <option value="novo">Incluir novo fornecedor…</option>
                             </select>
                         </div>
-                        <!-- FormulÃ¡rio para adicionar um novo fornecedor -->
+                        <!-- Formulário para adicionar um novo fornecedor -->
                         <div class="border rounded p-3" id="novo-fornecedor-group" style="display:none;">
                             <div class="row g-2">
                                 <div class="col-md-6">
@@ -119,7 +119,7 @@
                                     <input type="text" class="form-control" id="nf_nome_fantasia" required>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">RazÃ£o Social</label>
+                                    <label class="form-label">Razão Social</label>
                                     <input type="text" class="form-control" id="nf_razao_social">
                                 </div>
                                 <div class="col-md-4">
@@ -155,7 +155,7 @@
                                     <input type="text" class="form-control" id="nf_logradouro">
                                 </div>
                                 <div class="col-md-2">
-                                    <label class="form-label">NÃºmero</label>
+                                    <label class="form-label">Número</label>
                                     <input type="text" class="form-control" id="nf_numero">
                                 </div>
                                 <div class="col-md-4">
@@ -171,22 +171,22 @@
                                     <input type="text" class="form-control" id="nf_estado" maxlength="2">
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label">ObservaÃ§Ãµes</label>
+                                    <label class="form-label">Observações</label>
                                     <textarea class="form-control" id="nf_obs" rows="2"></textarea>
                                 </div>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label for="compra-valor">Valor do OrÃ§amento</label>
+                            <label for="compra-valor">Valor do Orçamento</label>
                             <input type="number" step="0.01" class="form-control" id="compra-valor" placeholder="0,00">
                         </div>
-                        <!-- Campo para selecionar a data do orÃ§amento -->
+                        <!-- Campo para selecionar a data do orçamento -->
                         <div class="form-group">
-                            <label for="compra-data">Data do OrÃ§amento</label>
+                            <label for="compra-data">Data do Orçamento</label>
                             <input type="date" class="form-control" id="compra-data">
                         </div>
                         <div class="form-group">
-                            <label for="compra-anexo">Anexar OrÃ§amento (PDF/Imagem)</label>
+                            <label for="compra-anexo">Anexar Orçamento (PDF/Imagem)</label>
                             <input type="file" class="form-control" id="compra-anexo">
                         </div>
                     </form>
@@ -204,7 +204,7 @@
 
 {% block javascripts %}
 <script>
-// Mostra ou esconde o formulÃ¡rio de novo fornecedor conforme a seleÃ§Ã£o
+// Mostra ou esconde o formulário de novo fornecedor conforme a seleção
 document.addEventListener('DOMContentLoaded', function() {
     const fornecedorSelect = document.getElementById('compra-fornecedor');
     const novoFornecedorGroup = document.getElementById('novo-fornecedor-group');
@@ -288,7 +288,7 @@ async function createCompra() {
         });
         const out2 = await respCompra.json();
         if (!respCompra.ok || !out2.success) {
-            alert(out2.message || 'Erro ao criar orÃ§amento.');
+            alert(out2.message || 'Erro ao criar orçamento.');
             return;
         }
         location.reload();
