@@ -1,4 +1,4 @@
-<!--
+﻿<!--
 =========================================================
 * Argon Dashboard - v1.2.0
 =========================================================
@@ -28,7 +28,7 @@
   </title>
 
   <!-- Favicon - atualizado para o logotipo da Amantini -->
-  <link rel="icon" href="{{ url_for(static, filename=assets/img/brand/logo.png) }}" type="image/png">
+  <link rel="icon" href="{{ url_for('static', filename='assets/img/brand/logo.png') }}" type="image/png">
   <!-- Fonts -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700">
   <!-- Icons -->
@@ -38,14 +38,43 @@
   <!-- Argon CSS -->
   <link rel="stylesheet" href="/static/assets/css/argon.css?v=1.2.0" type="text/css">
 
+  <style>
+    /* Mobile sidenav styles */
+    @media (max-width: 991.98px) {
+      body.sidenav-collapsed #sidenav-main {
+        transform: translateX(-100%);
+      }
+      body.sidenav-open #sidenav-main {
+        transform: translateX(0);
+      }
+      #sidenav-main {
+        transition: transform 0.3s ease;
+        z-index: 1030;
+      }
+      .sidenav-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.45);
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s ease;
+        z-index: 1025;
+      }
+      body.sidenav-open .sidenav-backdrop {
+        opacity: 1;
+        visibility: visible;
+      }
+    }
+  </style>
   <!-- Specific CSS goes HERE -->
   {% block stylesheets %}{% endblock stylesheets %}
 
 </head>
 
-<body class="">
+<body class="sidenav-collapsed">
 
   {% include "includes/sidenav.html" %}
+  <div class="sidenav-backdrop d-lg-none"></div>
 
   <div class="main-content" id="panel">
 
@@ -57,6 +86,75 @@
 
   {% include "includes/scripts.html" %}
 
+  <script>
+    (function initResponsiveSidenav() {
+      const body = document.body;
+      const sidenav = document.getElementById('sidenav-main');
+      if (!body || !sidenav) { return; }
+      const backdrop = document.querySelector('.sidenav-backdrop');
+      const toggler = document.querySelector('[data-action="sidenav-pin"]');
+      const BREAKPOINT = 992;
+      let touchStartX = null;
+
+      function closeSidenav() {
+        body.classList.remove('sidenav-open');
+        body.classList.add('sidenav-collapsed');
+      }
+
+      function openSidenav() {
+        body.classList.add('sidenav-open');
+        body.classList.remove('sidenav-collapsed');
+      }
+
+      function syncState() {
+        if (window.innerWidth < BREAKPOINT) {
+          if (!body.classList.contains('sidenav-open')) {
+            body.classList.add('sidenav-collapsed');
+          }
+        } else {
+          body.classList.remove('sidenav-open', 'sidenav-collapsed');
+        }
+      }
+
+      syncState();
+      window.addEventListener('resize', syncState);
+
+      if (toggler) {
+        toggler.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          if (body.classList.contains('sidenav-open')) {
+            closeSidenav();
+          } else {
+            openSidenav();
+          }
+        });
+      }
+
+      if (backdrop) {
+        backdrop.addEventListener('click', closeSidenav);
+      }
+
+      document.addEventListener('touchstart', function (event) {
+        if (event.touches.length !== 1) { return; }
+        touchStartX = event.touches[0].clientX;
+      }, { passive: true });
+
+      document.addEventListener('touchend', function (event) {
+        if (touchStartX === null) { return; }
+        const touchEndX = event.changedTouches[0].clientX;
+        const deltaX = touchEndX - touchStartX;
+        if (Math.abs(deltaX) > 60) {
+          if (deltaX < 0 && body.classList.contains('sidenav-open')) {
+            closeSidenav();
+          } else if (deltaX > 0 && body.classList.contains('sidenav-collapsed') && touchStartX < 40) {
+            openSidenav();
+          }
+        }
+        touchStartX = null;
+      }, { passive: true });
+    })();
+  </script>
   <!-- Specific JS goes HERE --> 
   {% block javascripts %}{% endblock javascripts %}
 
@@ -65,3 +163,4 @@
 </body>
 
 </html>
+
