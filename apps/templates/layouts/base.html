@@ -38,7 +38,7 @@
   <!-- Argon CSS -->
   <link rel="stylesheet" href="/static/assets/css/argon.css?v=1.2.0" type="text/css">
 
-  <style>
+    <style>
     .sidenav-backdrop {
       position: fixed;
       inset: 0;
@@ -51,6 +51,35 @@
     #sidenav-main {
       transition: transform 0.3s ease;
       z-index: 1030;
+    }
+    .sidenav-toggle-tab {
+      position: fixed;
+      top: 50%;
+      left: 0;
+      transform: translate(-50%, -50%);
+      background: #5e72e4;
+      color: #fff;
+      border: none;
+      border-radius: 0 8px 8px 0;
+      padding: 10px 12px;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      z-index: 1035;
+    }
+    .sidenav-toggle-tab i {
+      font-size: 18px;
+      line-height: 1;
+    }
+    body.sidenav-collapsed .sidenav-toggle-tab {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translate(0, -50%);
+    }
+    body.sidenav-open .sidenav-toggle-tab {
+      opacity: 0;
+      pointer-events: none;
     }
     body.sidenav-collapsed #sidenav-main {
       transform: translateX(-260px);
@@ -66,6 +95,9 @@
       visibility: visible;
     }
     @media (max-width: 991.98px) {
+      .sidenav-toggle-tab {
+        display: none;
+      }
       body.sidenav-collapsed #sidenav-main {
         transform: translateX(-100%);
       }
@@ -77,6 +109,7 @@
       }
     }
   </style>
+
   <!-- Specific CSS goes HERE -->
   {% block stylesheets %}{% endblock stylesheets %}
 
@@ -86,6 +119,9 @@
 
   {% include "includes/sidenav.html" %}
   <div class="sidenav-backdrop d-lg-none"></div>
+  <button id="sidenav-tab" class="sidenav-toggle-tab d-none d-lg-flex" type="button" aria-label="Mostrar menu lateral" aria-hidden="true">
+    <i class="ni ni-align-left"></i>
+  </button>
 
   <div class="main-content" id="panel">
 
@@ -104,6 +140,7 @@
       if (!body || !sidenav) { return; }
       const backdrop = document.querySelector('.sidenav-backdrop');
       const toggler = document.querySelector('[data-action="sidenav-pin"]');
+      const tab = document.getElementById('sidenav-tab');
       const BREAKPOINT = 992;
       let touchStartX = null;
       let userPinned = false;
@@ -112,12 +149,17 @@
         return window.innerWidth < BREAKPOINT;
       }
 
+      function updateTab() {
+        if (!tab) { return; }
+        const visible = !isMobile() && body.classList.contains('sidenav-collapsed');
+        tab.setAttribute('aria-hidden', visible ? 'false' : 'true');
+      }
+
       function closeSidenav(manual = false) {
         if (manual) { userPinned = true; }
         body.classList.add('sidenav-collapsed');
-        if (isMobile()) {
-          body.classList.remove('sidenav-open');
-        }
+        body.classList.remove('sidenav-open');
+        updateTab();
       }
 
       function openSidenav(manual = false) {
@@ -128,6 +170,7 @@
         } else {
           body.classList.remove('sidenav-open');
         }
+        updateTab();
       }
 
       function toggleSidenav() {
@@ -149,6 +192,7 @@
             body.classList.remove('sidenav-collapsed');
           }
         }
+        updateTab();
       }
 
       syncState();
@@ -162,15 +206,29 @@
         });
       }
 
+      if (tab) {
+        tab.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          openSidenav(true);
+        });
+      }
+
       if (backdrop) {
         backdrop.addEventListener('click', function () { closeSidenav(); });
       }
 
       document.addEventListener('click', function (event) {
-        if (isMobile() && body.classList.contains('sidenav-open')) {
-          const clickedInside = sidenav.contains(event.target) || (toggler && toggler.contains(event.target));
-          if (!clickedInside) {
+        const clickedInside = sidenav.contains(event.target) ||
+          (toggler && toggler.contains(event.target)) ||
+          (tab && tab.contains(event.target));
+        if (isMobile()) {
+          if (body.classList.contains('sidenav-open') && !clickedInside) {
             closeSidenav();
+          }
+        } else {
+          if (!body.classList.contains('sidenav-collapsed') && !clickedInside) {
+            closeSidenav(true);
           }
         }
       });
@@ -203,6 +261,8 @@
 </body>
 
 </html>
+
+
 
 
 
