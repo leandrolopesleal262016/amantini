@@ -1,0 +1,155 @@
+{% extends "layouts/base.html" %}
+
+{% block title %} Financeiro {% endblock %}
+
+{% block stylesheets %}
+<style>
+    .header.bg-gradient-primary {
+        background: linear-gradient(135deg, #2dce89 0%, #11cdef 100%) !important;
+    }
+    .finance-table tbody tr { cursor: pointer; }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+<div class="header bg-gradient-primary pb-8 pt-5 pt-md-8">
+    <div class="container-fluid">
+        <div class="header-body">
+            <div class="row align-items-center">
+                <div class="col-8">
+                    <h6 class="h2 text-white d-inline-block mb-0">Financeiro</h6>
+                    <p class="text-white mb-0">Tarefas aguardando nota ou boleto</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid mt--7">
+    <div class="row">
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-body">
+                    {% if tarefas %}
+                    <div class="table-responsive">
+                        <table class="table align-items-center table-flush finance-table">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th scope="col">Titulo</th>
+                                    <th scope="col">Responsavel</th>
+                                    <th scope="col">Concluida em</th>
+                                    <th scope="col">Tempo na coluna</th>
+                                    <th scope="col">Anexo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tarefa in tarefas %}
+                                <tr class="finance-task-row"
+                                    data-id="{{ tarefa.id }}"
+                                    data-title="{{ tarefa.title }}"
+                                    data-description="{{ tarefa.description }}"
+                                    data-observations="{{ tarefa.observations }}"
+                                    data-priority="{{ tarefa.priority }}"
+                                    data-assignee="{{ tarefa.assignee }}"
+                                    data-due-date="{{ tarefa.due_date.isoformat() if tarefa.due_date else '' }}"
+                                    data-status="{{ tarefa.status }}"
+                                    data-data-criacao="{{ tarefa.data_criacao.isoformat() if tarefa.data_criacao else '' }}"
+                                    data-data-conclusao="{{ tarefa.data_conclusao.isoformat() if tarefa.data_conclusao else '' }}"
+                                    data-duration="{{ tarefa.duration_display }}"
+                                    data-attachment-path="{{ tarefa.attachment_path if tarefa.attachment_path else '' }}">
+                                    <th scope="row">{{ tarefa.title }}</th>
+                                    <td>{{ tarefa.assignee or '-' }}</td>
+                                    <td>{{ tarefa.data_conclusao.strftime('%d/%m/%Y %H:%M') if tarefa.data_conclusao else '' }}</td>
+                                    <td>{{ tarefa.duration_display }}</td>
+                                    <td>
+                                        {% if tarefa.attachment_path %}
+                                        <a class="btn btn-sm btn-primary" href="{{ url_for('home_blueprint.download_attachment', filename=tarefa.attachment_path) }}" target="_blank">Download</a>
+                                        {% else %}
+                                        <span class="text-muted">Nenhum</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="ni ni-check-bold text-success display-4"></i>
+                        <p class="mt-3 mb-0">Nenhuma tarefa aguardando nota ou boleto no momento.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="financeTaskModal" tabindex="-1" role="dialog" aria-labelledby="financeTaskModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="financeTaskModalLabel">Detalhes da tarefa</h5>
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Fechar">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Titulo:</strong> <span id="fin-title"></span></p>
+                    <p><strong>Descricao:</strong> <span id="fin-description"></span></p>
+                    <p><strong>Observacoes:</strong> <span id="fin-observations"></span></p>
+                    <p><strong>Prioridade:</strong> <span id="fin-priority"></span></p>
+                    <p><strong>Responsavel:</strong> <span id="fin-assignee"></span></p>
+                    <p><strong>Data de vencimento:</strong> <span id="fin-due-date"></span></p>
+                    <p><strong>Status:</strong> <span id="fin-status"></span></p>
+                    <p><strong>Data de criacao:</strong> <span id="fin-data-criacao"></span></p>
+                    <p><strong>Concluida em:</strong> <span id="fin-data-conclusao"></span></p>
+                    <p><strong>Tempo na coluna:</strong> <span id="fin-duration"></span></p>
+                    <p><strong>Anexo:</strong> <span id="fin-attachment"></span></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.finance-task-row').forEach(function(row) {
+        row.addEventListener('click', function() {
+            document.getElementById('fin-title').textContent = this.getAttribute('data-title') || '';
+            document.getElementById('fin-description').textContent = this.getAttribute('data-description') || '';
+            document.getElementById('fin-observations').textContent = this.getAttribute('data-observations') || '';
+            document.getElementById('fin-priority').textContent = this.getAttribute('data-priority') || '';
+            document.getElementById('fin-assignee').textContent = this.getAttribute('data-assignee') || '';
+            const dueDate = this.getAttribute('data-due-date');
+            document.getElementById('fin-due-date').textContent = dueDate ? new Date(dueDate).toLocaleDateString('pt-BR') : '';
+            document.getElementById('fin-status').textContent = this.getAttribute('data-status') || '';
+            const dataCriacao = this.getAttribute('data-data-criacao');
+            document.getElementById('fin-data-criacao').textContent = dataCriacao ? new Date(dataCriacao).toLocaleString('pt-BR') : '';
+            const dataConclusao = this.getAttribute('data-data-conclusao');
+            document.getElementById('fin-data-conclusao').textContent = dataConclusao ? new Date(dataConclusao).toLocaleString('pt-BR') : '';
+            document.getElementById('fin-duration').textContent = this.getAttribute('data-duration') || '';
+
+            const attachmentPath = this.getAttribute('data-attachment-path') || '';
+            const attachmentContainer = document.getElementById('fin-attachment');
+            attachmentContainer.textContent = '';
+            if (attachmentPath) {
+                const link = document.createElement('a');
+                link.href = '/uploads/' + encodeURIComponent(attachmentPath);
+                link.textContent = 'Download';
+                link.target = '_blank';
+                attachmentContainer.appendChild(link);
+            } else {
+                attachmentContainer.textContent = 'Nenhum';
+            }
+
+            $('#financeTaskModal').modal('show');
+        });
+    });
+});
+</script>
+{% endblock %}

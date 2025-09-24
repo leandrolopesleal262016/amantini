@@ -4,23 +4,181 @@ Copyright (c) 2019 - present AppSeed.us
 """
 
 from apps.home import blueprint
-from flask import render_template, request, redirect, url_for, flash, jsonify
-from flask_login import login_required
-from jinja2 import TemplateNotFound
-from apps import db
-from apps.authentication.models import Contact
-# Adicione essas rotas ao arquivo apps/home/routes.py
 
-from apps.authentication.models import PedidoCompra, ItemPedido, Task, CompletedTask, Fornecedor, Compra
-from flask_login import current_user
-from datetime import datetime
-import os
-from werkzeug.utils import secure_filename
-from flask import current_app, send_from_directory
+import csv
 import json
 import os
+import re
+from datetime import datetime
+from decimal import Decimal, InvalidOperation
+
+from flask import abort, flash, jsonify, redirect, render_template, request, send_file, send_from_directory, url_for
+from flask_login import current_user, login_required
+from jinja2 import TemplateNotFound
 from werkzeug.utils import secure_filename
-from flask import current_app, send_from_directory
+import io
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.pdfgen import canvas
+
+
+from apps import db
+from apps.authentication.models import (
+    Contact,
+    Obra,
+    PedidoCompra,
+    ItemPedido,
+    Task,
+    CompletedTask,
+    Fornecedor,
+    Compra,
+)
+
+DATA_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'data'))
+FORNECEDORES_CSV = os.path.join(DATA_FOLDER, 'fornecedores.csv')
+os.makedirs(DATA_FOLDER, exist_ok=True)
+
+def _normalize_cell(value):
+    return value.strip() if isinstance(value, str) else ''
+
+
+def _truncate(value, max_length):
+    if not value:
+        return value
+    value = value.strip()
+    return value if len(value) <= max_length else value[:max_length]
+
+
+def load_csv_fornecedores():
+    if not os.path.isfile(FORNECEDORES_CSV):
+        return []
+    encodings = ('utf-8-sig', 'cp1252', 'latin-1')
+    for encoding in encodings:
+        try:
+            with open(FORNECEDORES_CSV, newline='', encoding=encoding) as csvfile:
+                reader = csv.DictReader(csvfile, delimiter=';')
+                rows = []
+                for row in reader:
+                    def pick(*keys):
+                        for key in keys:
+                            val = row.get(key)
+                            if val:
+                                return val
+                        return ''
+                    rows.append({
+                        'razao_social': _normalize_cell(pick('RAZÃO SOCIAL', 'RAZAO SOCIAL', 'Razão Social', 'Razao Social')),
+                        'nome_fantasia': _normalize_cell(pick('NOME FANTASIA', 'Nome Fantasia')),
+                        'cnpj': _normalize_cell(pick('CNPJ')),
+                        'contato': _normalize_cell(pick('CONTATO (WhatsApp)', 'CONTATO', 'WhatsApp', 'TELEFONE')),
+                        'email': _normalize_cell(pick('E-MAIL', 'EMAIL')),
+                        'cidade': _normalize_cell(pick('CIDADE', 'Cidade')),
+                        'estado': _normalize_cell(pick('ESTADO', 'Estado', 'UF')),
+                    })
+                return rows
+        except UnicodeDecodeError:
+            continue
+    return []
+
+
+def normalize_cnpj(value):
+    raw = (value or '').strip()
+    if not raw:
+        return ''
+    digits = re.sub(r'\D', '', raw)
+    upper = raw.upper()
+    if 'E' in upper or (',' in raw and len(digits) < 14):
+        candidate = raw.replace('.', '').replace('/', '').replace('-', '').replace(' ', '').replace(',', '.')
+        try:
+            digits = f"{int(Decimal(candidate)):014d}"
+        except (InvalidOperation, ValueError):
+            digits = re.sub(r'\D', '', candidate)
+    if len(digits) > 14:
+        digits = digits[-14:]
+    return digits
+
+
+def sync_csv_fornecedores(usuario_id):
+    rows = load_csv_fornecedores()
+    if not rows:
+        return 0, 0
+    existing = Fornecedor.query.filter_by(usuario_id=usuario_id).all()
+    by_cnpj = {}
+    by_name = {}
+    for fornecedor in existing:
+        if fornecedor.cnpj:
+            by_cnpj[fornecedor.cnpj] = fornecedor
+        key = (fornecedor.nome or fornecedor.nome_fantasia or '').strip().lower()
+        if key:
+            by_name[key] = fornecedor
+    created = 0
+    updated = 0
+    for row in rows:
+        display_name_source = row['nome_fantasia'] or row['razao_social']
+        display_name = display_name_source.strip() if display_name_source else ''
+        if not display_name:
+            continue
+        cnpj = normalize_cnpj(row['cnpj'])
+        fornecedor = by_cnpj.get(cnpj) if cnpj else None
+        if not fornecedor:
+            fornecedor = by_name.get(display_name.lower())
+        if fornecedor:
+            changed = False
+            if not fornecedor.nome:
+                fornecedor.nome = _truncate(display_name, 100)
+                changed = True
+            if row['razao_social'] and not fornecedor.razao_social:
+                fornecedor.razao_social = _truncate(row['razao_social'], 150)
+                changed = True
+            if row['nome_fantasia'] and not fornecedor.nome_fantasia:
+                fornecedor.nome_fantasia = _truncate(row['nome_fantasia'], 150)
+                changed = True
+            if cnpj and not fornecedor.cnpj:
+                fornecedor.cnpj = cnpj
+                by_cnpj[cnpj] = fornecedor
+                changed = True
+            if row['email'] and not fornecedor.email:
+                fornecedor.email = _truncate(row['email'], 100)
+                changed = True
+            contato = _truncate(row['contato'], 20)
+            if contato:
+                if not fornecedor.telefone:
+                    fornecedor.telefone = contato
+                    changed = True
+                if not fornecedor.celular:
+                    fornecedor.celular = contato
+                    changed = True
+            if row['cidade'] and not fornecedor.cidade:
+                fornecedor.cidade = _truncate(row['cidade'], 100)
+                changed = True
+            if row['estado']:
+                estado = row['estado'].strip().upper()[:2]
+                if estado and fornecedor.estado != estado:
+                    fornecedor.estado = estado
+                    changed = True
+            if changed:
+                updated += 1
+            continue
+        contato = _truncate(row['contato'], 20)
+        novo = Fornecedor(
+            nome=_truncate(display_name, 100),
+            razao_social=_truncate(row['razao_social'] or display_name, 150),
+            nome_fantasia=_truncate(row['nome_fantasia'] or display_name, 150),
+            cnpj=cnpj or None,
+            telefone=contato,
+            email=_truncate(row['email'], 100),
+            cidade=_truncate(row['cidade'], 100),
+            estado=row['estado'].strip().upper()[:2] if row['estado'] else None,
+            celular=contato,
+            usuario_id=usuario_id,
+        )
+        db.session.add(novo)
+        if cnpj:
+            by_cnpj[cnpj] = novo
+        by_name[display_name.lower()] = novo
+        created += 1
+    if created or updated:
+        db.session.commit()
+    return created, updated
 
 # -----------------------------------------------------------------------------
 # Upload configuration
@@ -39,11 +197,17 @@ os.makedirs(ORCAMENTO_FOLDER, exist_ok=True)
 def download_attachment(filename):
     """Serve um arquivo anexado a uma tarefa concluída.
 
-    Os arquivos são armazenados em ``UPLOAD_FOLDER`` com nomes únicos.
-    Este endpoint usa ``send_from_directory`` para entregar o arquivo como
-    download. Requer que o usuário esteja logado.
+    Prioriza os anexos salvos em ``UPLOAD_FOLDER`` e oferece um fallback
+    para o diretório legado ``apps/static/uploads`` usado anteriormente.
     """
-    return send_from_directory(UPLOAD_FOLDER, filename, as_attachment=True)
+    if os.path.isfile(os.path.join(UPLOAD_FOLDER, filename)):
+        return send_from_directory(UPLOAD_FOLDER, filename, as_attachment=True)
+
+    legacy_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static', 'uploads'))
+    if os.path.isfile(os.path.join(legacy_folder, filename)):
+        return send_from_directory(legacy_folder, filename, as_attachment=True)
+
+    abort(404)
 
 # Novo endpoint para baixar anexos de orçamentos.
 @blueprint.route('/orcamentos/<path:filename>')
@@ -63,7 +227,11 @@ def pedidos_compra():
 @login_required
 def novo_pedido_compra():
     """Formulário para novo pedido de compra"""
-    return render_template('home/pedido_compra_form.html', segment='pedidos')
+    obras = (Obra.query
+             .filter_by(usuario_id=current_user.id)
+             .order_by(Obra.nome)
+             .all())
+    return render_template('home/pedido_compra_form.html', obras=obras, segment='pedidos')
 
 @blueprint.route('/pedidos-compra/criar', methods=['POST'])
 @login_required
@@ -71,11 +239,30 @@ def criar_pedido_compra():
     """Cria um novo pedido de compra"""
     try:
         # Criar o pedido
+        obra_id_raw = request.form.get('obra_id')
+        if not obra_id_raw:
+            raise ValueError('Selecione uma obra válida.')
+        try:
+            obra_id = int(obra_id_raw)
+        except (TypeError, ValueError):
+            raise ValueError('Obra selecionada é inválida.')
+        obra = Obra.query.filter_by(id=obra_id, usuario_id=current_user.id).first()
+        if not obra:
+            raise ValueError('Obra selecionada não encontrada.')
+
+        data_necessidade_str = request.form.get('data_necessidade')
+        if not data_necessidade_str:
+            raise ValueError('Informe a data de necessidade do pedido.')
+
+        data_necessidade = datetime.strptime(data_necessidade_str, '%Y-%m-%d').date()
+
         pedido = PedidoCompra(
-            obra=request.form.get('obra', 'FAGA'),
+            obra=obra.nome,
+            obra_id=obra.id,
+            obra_endereco=obra.endereco,
             responsavel=request.form.get('responsavel'),
             prioridade=request.form.get('prioridade'),
-            data_necessidade=datetime.strptime(request.form.get('data_necessidade'), '%Y-%m-%d').date(),
+            data_necessidade=data_necessidade,
             status=request.form.get('status', 'solicitado'),
             observacoes=request.form.get('observacoes', ''),
             usuario_id=current_user.id
@@ -115,12 +302,91 @@ def ver_pedido_compra(pedido_id):
     pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
     return render_template('home/pedido_compra_detalhes.html', pedido=pedido, segment='pedidos')
 
+@blueprint.route('/pedidos-compra/<int:pedido_id>/pdf')
+@login_required
+def pedido_compra_pdf(pedido_id):
+    """Gera um PDF com os dados completos do pedido de compra."""
+    pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
+
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    margin = 30
+    y = height - margin
+
+    def write_line(text, *, size=11, leading=16, bold=False):
+        nonlocal y
+        font_name = 'Helvetica-Bold' if bold else 'Helvetica'
+        if y <= margin:
+            pdf.showPage()
+            y = height - margin
+        pdf.setFont(font_name, size)
+        pdf.drawString(margin, y, text)
+        y -= leading
+
+    def write_key_value(label, value):
+        write_line(f"{label}: {value}", size=11, leading=15)
+
+    pdf.setTitle(f"Pedido de Compra #{pedido.id}")
+
+    write_line("Pedido de Compra", size=16, bold=True)
+    write_line(f"Número: {pedido.id}", size=12, leading=18)
+    write_line("")
+
+    obra_nome = pedido.obra or (pedido.obra_rel.nome if pedido.obra_rel else '-')
+    obra_endereco = pedido.obra_endereco or (pedido.obra_rel.endereco if pedido.obra_rel else '')
+
+    write_line("Informações da Obra", size=13, bold=True)
+    write_key_value("Obra", obra_nome)
+    if obra_endereco:
+        write_key_value("Endereço", obra_endereco)
+    write_line("")
+
+    write_line("Detalhes do Pedido", size=13, bold=True)
+    write_key_value("Responsável", pedido.responsavel or '-')
+    write_key_value("Prioridade", (pedido.prioridade or '-').title())
+    write_key_value("Status", (pedido.status or '-').replace('_', ' ').title())
+    write_key_value("Data de necessidade", pedido.data_necessidade.strftime('%d/%m/%Y'))
+    write_key_value("Data de criação", pedido.data_criacao.strftime('%d/%m/%Y %H:%M'))
+    write_line("")
+
+    if pedido.observacoes:
+        write_line("Observações", size=13, bold=True)
+        for linha in pedido.observacoes.splitlines():
+            write_line(linha)
+        write_line("")
+
+    write_line("Itens", size=13, bold=True)
+    write_line("Código / Descrição / Quantidade / Unidade", bold=True, size=11, leading=14)
+    for item in pedido.itens:
+        descricao = f"{item.codigo_item} - {item.nome_item}"
+        quantidade = f"{item.quantidade:g}"
+        write_line(descricao)
+        detalhes = f"Qtd: {quantidade} {item.unidade}"
+        if item.observacao:
+            detalhes += f" | Obs: {item.observacao}"
+        write_line(detalhes, size=10)
+        write_line("")
+
+    if not pedido.itens:
+        write_line("(Nenhum item cadastrado)")
+
+    pdf.save()
+    buffer.seek(0)
+
+    filename = f"pedido_compra_{pedido.id}.pdf"
+    return send_file(buffer, as_attachment=True, download_name=filename, mimetype='application/pdf')
+
 @blueprint.route('/pedidos-compra/<int:pedido_id>/editar')
 @login_required
 def editar_pedido_compra(pedido_id):
     """Edita um pedido de compra"""
     pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
-    return render_template('home/pedido_compra_form.html', pedido=pedido, segment='pedidos')
+    obras = (Obra.query
+             .filter_by(usuario_id=current_user.id)
+             .order_by(Obra.nome)
+             .all())
+    return render_template('home/pedido_compra_form.html', pedido=pedido, obras=obras, obra_atual=pedido.obra_rel, segment='pedidos')
 
 @blueprint.route('/pedidos-compra/<int:pedido_id>/atualizar', methods=['POST'])
 @login_required
@@ -128,7 +394,21 @@ def atualizar_pedido_compra(pedido_id):
     """Atualiza um pedido de compra"""
     try:
         pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
+        obra_id_raw = request.form.get('obra_id')
+        if not obra_id_raw:
+            raise ValueError('Selecione uma obra válida.')
+        try:
+            obra_id = int(obra_id_raw)
+        except (TypeError, ValueError):
+            raise ValueError('Obra selecionada é inválida.')
+        obra = Obra.query.filter_by(id=obra_id, usuario_id=current_user.id).first()
+        if not obra:
+            raise ValueError('Obra selecionada não encontrada.')
         
+        pedido.obra = obra.nome
+        pedido.obra_id = obra.id
+        pedido.obra_endereco = obra.endereco
+
         # Atualizar dados do pedido
         pedido.responsavel = request.form.get('responsavel')
         pedido.prioridade = request.form.get('prioridade')
@@ -171,11 +451,29 @@ def api_criar_pedido():
         dados = request.get_json()
         
         # Criar o pedido
+        obra_id_raw = dados.get('obra_id')
+        if not obra_id_raw:
+            raise ValueError('Selecione uma obra válida.')
+        try:
+            obra_id = int(obra_id_raw)
+        except (TypeError, ValueError):
+            raise ValueError('Obra selecionada é inválida.')
+        obra = Obra.query.filter_by(id=obra_id, usuario_id=current_user.id).first()
+        if not obra:
+            raise ValueError('Obra selecionada não encontrada.')
+
+        data_necessidade_str = dados.get('dataNecessidade')
+        if not data_necessidade_str:
+            raise ValueError('Informe a data de necessidade do pedido.')
+        data_necessidade = datetime.strptime(data_necessidade_str, '%Y-%m-%d').date()
+
         pedido = PedidoCompra(
-            obra=dados.get('obra', 'FAGA'),
+            obra=obra.nome,
+            obra_id=obra.id,
+            obra_endereco=obra.endereco,
             responsavel=dados['responsavel'],
             prioridade=dados['prioridade'],
-            data_necessidade=datetime.strptime(dados['dataNecessidade'], '%Y-%m-%d').date(),
+            data_necessidade=data_necessidade,
             status=dados.get('status', 'solicitado'),
             observacoes=dados.get('observacoes', ''),
             usuario_id=current_user.id
@@ -325,9 +623,7 @@ def api_update_task(task_id):
 @blueprint.route('/api/tasks/<int:task_id>/complete', methods=['POST'])
 @login_required
 def api_complete_task(task_id):
-    import os
-    from datetime import datetime
-    from werkzeug.utils import secure_filename
+
 
     # Busca a tarefa do usuário logado
     task = Task.query.filter_by(id=task_id, usuario_id=current_user.id).first_or_404()
@@ -383,7 +679,7 @@ def api_complete_task(task_id):
         filename = secure_filename(attachment_file.filename)
         timestamp = datetime.utcnow().strftime('%Y%m%d%H%M%S')
         filename = f"{task.id}_{timestamp}_{filename}"
-        upload_dir = os.path.join(os.getcwd(), 'apps', 'static', 'uploads')
+        upload_dir = UPLOAD_FOLDER
         os.makedirs(upload_dir, exist_ok=True)
         file_full = os.path.join(upload_dir, filename)
         attachment_file.save(file_full)
@@ -454,6 +750,7 @@ def tarefas_concluidas():
 @login_required
 def compras():
     """Exibe a página de compras (orçamentos) com todos os registros do usuário."""
+    sync_csv_fornecedores(current_user.id)
     # Recupera todas as compras do usuário atual
     compras = (Compra.query
                .filter_by(usuario_id=current_user.id)
@@ -466,6 +763,43 @@ def compras():
                     .all())
     return render_template('home/compras.html', compras=compras, fornecedores=fornecedores, segment='compras')
 
+
+@blueprint.route('/api/obras', methods=['POST'])
+@login_required
+def api_criar_obra():
+    """Cria uma nova obra (projeto) a partir dos dados enviados via formulário ou JSON."""
+    data = request.form if request.form else (request.get_json() or {})
+    nome = (data.get('nome') or data.get('nome_obra') or '').strip()
+    endereco = (data.get('endereco') or data.get('endereco_obra') or '').strip()
+
+    if not nome:
+        return jsonify({'success': False, 'message': 'Informe o nome da obra.'}), 400
+
+    nome = nome[:150]
+    endereco = endereco[:255] if endereco else None
+
+    existente = (Obra.query
+                 .filter_by(usuario_id=current_user.id)
+                 .filter(Obra.nome.ilike(nome))
+                 .first())
+    if existente:
+        return jsonify({
+            'success': True,
+            'obra_id': existente.id,
+            'nome': existente.nome,
+            'endereco': existente.endereco or ''
+        })
+
+    obra = Obra(nome=nome, endereco=endereco, usuario_id=current_user.id)
+    db.session.add(obra)
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'obra_id': obra.id,
+        'nome': obra.nome,
+        'endereco': obra.endereco or ''
+    })
 
 @blueprint.route('/api/fornecedores', methods=['POST'])
 @login_required
@@ -546,9 +880,7 @@ def api_criar_compra():
         filename = secure_filename(attachment_file.filename)
         timestamp = datetime.utcnow().strftime('%Y%m%d%H%M%S')
         filename = f"{current_user.id}_{timestamp}_{filename}"
-        upload_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'media', 'orcamentos'))
-        os.makedirs(upload_dir, exist_ok=True)
-        save_path = os.path.join(upload_dir, filename)
+        save_path = os.path.join(ORCAMENTO_FOLDER, filename)
         attachment_file.save(save_path)
         attachment_path = filename
     # Converte a data do orçamento, se fornecida
@@ -727,6 +1059,24 @@ def delete_contact(id):
 
     return redirect(url_for('home_blueprint.contacts'))
 
+
+@blueprint.route('/financeiro')
+@login_required
+def financeiro():
+    """Lista tarefas concluídas que aguardam nota ou boleto."""
+    aguardando = (CompletedTask.query
+                  .filter_by(usuario_id=current_user.id, status='Aguardando Nota/Boleto')
+                  .order_by(CompletedTask.data_conclusao.desc())
+                  .all())
+    for tarefa in aguardando:
+        if getattr(tarefa, 'data_criacao', None) and tarefa.data_conclusao:
+            duration_days = (tarefa.data_conclusao.date() - tarefa.data_criacao.date()).days
+            if duration_days < 0:
+                duration_days = 0
+            tarefa.duration_display = f"{duration_days} dia{'s' if duration_days != 1 else ''}"
+        else:
+            tarefa.duration_display = ''
+    return render_template('home/financeiro.html', tarefas=aguardando, segment='financeiro')
 # Helper - Extract current page name from request
 def get_segment(request):
     try:

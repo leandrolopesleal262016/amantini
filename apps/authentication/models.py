@@ -27,6 +27,8 @@ class Users(db.Model, UserMixin):
 
     # Relacionamento para tarefas. Permite acessar tasks via user.tasks
     tasks = db.relationship('Task', backref='usuario', lazy=True, cascade='all, delete-orphan')
+    # Relacionamento para obras do usuário
+    obras = db.relationship('Obra', backref='usuario', lazy=True, cascade='all, delete-orphan')
 
 class Contact(db.Model):
     __tablename__ = 'Contacts'
@@ -39,13 +41,29 @@ class Contact(db.Model):
     def __repr__(self):
         return f'<Contact {self.name}>'
 
+
+class Obra(db.Model):
+    __tablename__ = 'obras'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(150), nullable=False)
+    endereco = db.Column(db.String(255), nullable=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('Users.id'), nullable=False)
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+
+    pedidos = db.relationship('PedidoCompra', backref='obra_rel', lazy=True)
+
+    def __repr__(self):
+        return f'<Obra {self.id} - {self.nome}>'
 # ⭐ MODELOS DE PEDIDO DE COMPRA - VERSÃO CORRIGIDA
 
 class PedidoCompra(db.Model):
     __tablename__ = 'pedidos_compra'
     
     id = db.Column(db.Integer, primary_key=True)
-    obra = db.Column(db.String(100), nullable=False, default='FAGA')
+    obra = db.Column(db.String(150), nullable=False, default='FAGA')
+    obra_id = db.Column(db.Integer, db.ForeignKey('obras.id'), nullable=True)
+    obra_endereco = db.Column(db.String(255), nullable=True)
     responsavel = db.Column(db.String(100), nullable=False)
     prioridade = db.Column(db.String(20), nullable=False)  # baixa, media, alta, urgente
     data_necessidade = db.Column(db.Date, nullable=False)

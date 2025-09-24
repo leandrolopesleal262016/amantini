@@ -3,7 +3,7 @@
 {% block title %} Pedido de Compra {% endblock %}
 
 <!-- Specific Page CSS goes HERE  -->
-<!-- Substitua a seção de estilos no seu arquivo pedido_compra_form.html por esta versão -->
+<!-- Substitua a seÃ§Ã£o de estilos no seu arquivo pedido_compra_form.html por esta versÃ£o -->
 
 {% block stylesheets %}
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -33,9 +33,9 @@
         transform: translateY(-1px);
     }
 
-    /* === CORREÇÃO PARA ALINHAMENTO VERTICAL DOS TEXTOS === */
+    /* === CORREÃ‡ÃƒO PARA ALINHAMENTO VERTICAL DOS TEXTOS === */
     
-    /* Correção para campos de formulário */
+    /* CorreÃ§Ã£o para campos de formulÃ¡rio */
     .form-control {
         display: flex !important;
         align-items: center !important;
@@ -44,7 +44,7 @@
         padding: 0.375rem 0.75rem !important;
     }
 
-    /* Correção específica para selects */
+    /* CorreÃ§Ã£o especÃ­fica para selects */
     select.form-control {
         height: 38px !important;
         line-height: 38px !important;
@@ -53,7 +53,7 @@
         appearance: menulist !important;
     }
 
-    /* Correção para inputs de texto e número */
+    /* CorreÃ§Ã£o para inputs de texto e nÃºmero */
     input.form-control {
         height: 38px !important;
         line-height: 1.5 !important;
@@ -61,7 +61,7 @@
         vertical-align: middle !important;
     }
 
-    /* Correção para textarea */
+    /* CorreÃ§Ã£o para textarea */
     textarea.form-control {
         min-height: auto !important;
         display: block !important;
@@ -69,7 +69,7 @@
         padding: 0.375rem 0.75rem !important;
     }
 
-    /* Correção específica para Select2 */
+    /* CorreÃ§Ã£o especÃ­fica para Select2 */
     .select2-container--classic .select2-selection--single {
         height: 38px !important;
         border: 1px solid #cad1d7 !important;
@@ -90,13 +90,13 @@
         right: 1px !important;
     }
 
-    /* Garantir que os placeholders também fiquem centralizados */
+    /* Garantir que os placeholders tambÃ©m fiquem centralizados */
     .form-control::placeholder {
         vertical-align: middle !important;
         line-height: 1.5 !important;
     }
 
-    /* Correção para campos de data */
+    /* CorreÃ§Ã£o para campos de data */
     input[type="date"].form-control {
         height: 38px !important;
         line-height: 1.5 !important;
@@ -104,7 +104,7 @@
         align-items: center !important;
     }
 
-    /* Correção para campos numéricos */
+    /* CorreÃ§Ã£o para campos numÃ©ricos */
     input[type="number"].form-control {
         height: 38px !important;
         line-height: 1.5 !important;
@@ -119,7 +119,7 @@
         color: #525f7f !important;
     }
 
-    /* Correção adicional para compatibilidade com Bootstrap */
+    /* CorreÃ§Ã£o adicional para compatibilidade com Bootstrap */
     .form-group {
         margin-bottom: 1rem !important;
     }
@@ -129,7 +129,7 @@
         box-shadow: 0 0 0 0.2rem rgba(94, 114, 228, 0.25) !important;
     }
 
-    /* === FIM DA CORREÇÃO === */
+    /* === FIM DA CORREÃ‡ÃƒO === */
 
 </style>
 {% endblock stylesheets %}
@@ -179,18 +179,18 @@
                     <form id="pedidoCompraForm" method="POST" 
                           action="{% if pedido %}{{ url_for('home_blueprint.atualizar_pedido_compra', pedido_id=pedido.id) }}{% else %}{{ url_for('home_blueprint.criar_pedido_compra') }}{% endif %}">
                         
-                        <!-- Informações Básicas -->
+                        <!-- InformaÃ§Ãµes BÃ¡sicas -->
                         <div class="row mb-4">
                             <div class="col-12">
                                 <h4 class="section-title">
-                                    <i class="fas fa-info-circle me-2"></i>Informações Básicas
+                                    <i class="fas fa-info-circle me-2"></i>InformaÃ§Ãµes BÃ¡sicas
                                 </h4>
                             </div>
                             <div class="col-md-6">
                                 <div class="form-group">
-                                    <label class="form-control-label" for="responsavel">Responsável</label>
+                                    <label class="form-control-label" for="responsavel">ResponsÃ¡vel</label>
                                     <select class="form-control" id="responsavel" name="responsavel" data-toggle="select" data-size="7" required>
-                                        <option value="">Selecione o responsável...</option>
+                                        <option value="">Selecione o responsÃ¡vel...</option>
                                         <option value="Isabela" {% if pedido and pedido.responsavel == 'Isabela' %}selected{% endif %}>Isabela</option>
                                         <option value="Lucca" {% if pedido and pedido.responsavel == 'Lucca' %}selected{% endif %}>Lucca</option>
                                         <option value="Victor" {% if pedido and pedido.responsavel == 'Victor' %}selected{% endif %}>Victor</option>
@@ -200,12 +200,44 @@
                                     </select>
                                 </div>
                             </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-control-label" for="obra_id">Obra</label>
+                                    <div class="d-flex align-items-center">
+                                        <select class="form-control" id="obra_id" name="obra_id" required>
+                                            <option value="">Selecione a obra...</option>
+                                            {% for obra in obras or [] %}
+                                            <option value="{{ obra.id }}" data-endereco="{{ obra.endereco or '' }}" {% if pedido and pedido.obra_id == obra.id %}selected{% endif %}>{{ obra.nome }}</option>
+                                            {% endfor %}
+                                            <option value="novo">Cadastrar nova obraâ€¦</option>
+                                        </select>
+                                        <button type="button" class="btn btn-outline-success ml-2" data-toggle="modal" data-target="#novaObraModal">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                    </div>
+                                    <small class="form-text text-muted mt-2" id="obra-endereco-text">
+                                        {% set endereco_atual = '' %}
+                                        {% if pedido %}
+                                            {% if pedido.obra_endereco %}
+                                                {% set endereco_atual = pedido.obra_endereco %}
+                                            {% elif pedido.obra_rel and pedido.obra_rel.endereco %}
+                                                {% set endereco_atual = pedido.obra_rel.endereco %}
+                                            {% endif %}
+                                        {% endif %}
+                                        {% if endereco_atual %}
+                                            <i class="fas fa-map-marker-alt mr-1 text-success"></i>{{ endereco_atual }}
+                                        {% else %}
+                                            Informe ou cadastre uma obra para exibir o endereÃ§o.
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            </div>
                             <div class="col-md-3">
                                 <div class="form-group">
                                     <label class="form-control-label" for="prioridade">Prioridade</label>
                                     <select class="form-control" id="prioridade" name="prioridade" data-toggle="select" required>
                                         <option value="baixa" {% if pedido and pedido.prioridade == 'baixa' %}selected{% endif %}>Baixa</option>
-                                        <option value="media" {% if pedido and pedido.prioridade == 'media' %}selected{% endif %}>Média</option>
+                                        <option value="media" {% if pedido and pedido.prioridade == 'media' %}selected{% endif %}>MÃ©dia</option>
                                         <option value="alta" {% if pedido and pedido.prioridade == 'alta' %}selected{% endif %}>Alta</option>
                                         <option value="urgente" {% if pedido and pedido.prioridade == 'urgente' %}selected{% endif %}>Urgente</option>
                                     </select>
@@ -220,7 +252,7 @@
                             </div>
                         </div>
 
-                        <!-- Status (só aparece na edição) -->
+                        <!-- Status (sÃ³ aparece na ediÃ§Ã£o) -->
                         {% if pedido %}
                         <div class="row mb-4">
                             <div class="col-md-6">
@@ -239,7 +271,7 @@
                         <input type="hidden" id="status" name="status" value="solicitado">
                         {% endif %}
 
-                        <!-- Seção para adicionar o campo Observação -->
+                        <!-- SeÃ§Ã£o para adicionar o campo ObservaÃ§Ã£o -->
 <!-- Substitua esta parte no seu arquivo pedido_compra_form.html -->
 
 <!-- Adicionar Item -->
@@ -256,24 +288,24 @@
                     <div class="form-group">
                         <label class="form-control-label">Item</label>
                         <select class="form-control" id="novoItem" data-toggle="select" data-size="7">
-                            {# A lista de itens é gerada a partir da planilha de materiais e incluída aqui #}
+                            {# A lista de itens Ã© gerada a partir da planilha de materiais e incluÃ­da aqui #}
                             {% include 'home/_material_options.html' %}
                         </select>
                     </div>
                 </div>
                 
-                <!-- Coluna de observação e cadastro de novo item -->
+                <!-- Coluna de observaÃ§Ã£o e cadastro de novo item -->
                 <div class="col-md-3">
                     <div class="form-group">
-                        <label class="form-control-label">Observação</label>
+                        <label class="form-control-label">ObservaÃ§Ã£o</label>
                         <input type="text" class="form-control" id="novaObservacao" 
-                               placeholder="Ex: Cor branca, Marca específica...">
-                        <small class="text-muted">Cor, marca, especificação...</small>
-                        <!-- Campo para cadastrar novo item, exibido somente quando a opção 'Incluir novo item...' é selecionada -->
+                               placeholder="Ex: Cor branca, Marca especÃ­fica...">
+                        <small class="text-muted">Cor, marca, especificaÃ§Ã£o...</small>
+                        <!-- Campo para cadastrar novo item, exibido somente quando a opÃ§Ã£o 'Incluir novo item...' Ã© selecionada -->
                         <div id="novoItemNomeGroup" style="display:none; margin-top:0.5rem;">
                             <label class="form-control-label">Novo item</label>
                             <input type="text" class="form-control" id="novoItemNome" placeholder="Digite o nome do novo item">
-                            <small class="text-muted">Nome do item que não está na lista</small>
+                            <small class="text-muted">Nome do item que nÃ£o estÃ¡ na lista</small>
                         </div>
                     </div>
                 </div>
@@ -291,13 +323,13 @@
                         <select class="form-control" id="novaUnidade">
                             <option value="un">Unidades (un)</option>
                             <option value="m">Metros (m)</option>
-                            <option value="m2">Metros² (m²)</option>
-                            <option value="m3">Metros³ (m³)</option>
+                            <option value="m2">MetrosÂ² (mÂ²)</option>
+                            <option value="m3">MetrosÂ³ (mÂ³)</option>
                             <option value="kg">Quilos (kg)</option>
                             <option value="sc">Sacas (sc)</option>
-                            <option value="gl">Galões (gl)</option>
+                            <option value="gl">GalÃµes (gl)</option>
                             <option value="cx">Caixas (cx)</option>
-                            <option value="pc">Peças (pc)</option>
+                            <option value="pc">PeÃ§as (pc)</option>
                             <option value="lt">Litros (lt)</option>
                             <option value="ton">Toneladas (ton)</option>
                         </select>
@@ -316,229 +348,6 @@
     </div>
 </div>
 
-<!-- JavaScript atualizado -->
-<script>
-    let itens = [];
-    let contadorItem = 0;
-
-    function adicionarItem() {
-        const selectEl = document.getElementById('novoItem');
-        let item = selectEl.value;
-        const observacao = document.getElementById('novaObservacao').value;
-        const quantidade = document.getElementById('novaQuantidade').value;
-        const unidade = document.getElementById('novaUnidade').value;
-
-        if (!quantidade || quantidade <= 0) {
-            alert('Por favor, informe uma quantidade válida.');
-            return;
-        }
-
-        // Se o usuário selecionou "Incluir novo item...", obtemos o nome do novo item e geramos um código slug
-        let itemTexto;
-        if (item === 'novo') {
-            const nomeNovo = document.getElementById('novoItemNome').value.trim();
-            if (!nomeNovo) {
-                alert('Digite o nome do novo item.');
-                return;
-            }
-            // Função para slugificar o nome (remover acentos e espaços)
-            const slugify = (str) => {
-                return str.toString().toLowerCase()
-                    .normalize('NFD')
-                    .replace(/[\u0300-\u036f]/g, '')
-                    .replace(/[^a-z0-9]+/g, '_')
-                    .replace(/^_+|_+$/g, '');
-            };
-            itemTexto = nomeNovo;
-            item = slugify(nomeNovo);
-            // Opcional: adicionar o novo item à lista suspensa para reutilizar
-            const newOption = new Option(nomeNovo, item, false, false);
-            selectEl.add(newOption);
-        } else {
-            // Usa o texto da opção selecionada
-            itemTexto = selectEl.selectedOptions[0].text;
-        }
-
-        if (!item) {
-            alert('Por favor, selecione um item.');
-            return;
-        }
-
-        const novoItem = {
-            id: ++contadorItem,
-            codigo: item,
-            nome: itemTexto,
-            observacao: observacao || '',
-            quantidade: parseFloat(quantidade),
-            unidade: unidade
-        };
-
-        itens.push(novoItem);
-        renderizarItens();
-
-        // Limpar campos
-        document.getElementById('novoItem').value = '';
-        document.getElementById('novoItemNome').value = '';
-        document.getElementById('novoItemNomeGroup').style.display = 'none';
-        document.getElementById('novaObservacao').value = '';
-        document.getElementById('novaQuantidade').value = '';
-        document.getElementById('novaUnidade').value = 'un';
-        $('#novoItem').select2('val', '');
-    }
-
-    function renderizarItens() {
-        const container = document.getElementById('listaItens');
-        const contador = document.getElementById('contadorItens');
-        
-        if (itens.length === 0) {
-            container.innerHTML = `
-                <div class="text-center text-muted p-4">
-                    <i class="fas fa-box-open fa-3x mb-3"></i>
-                    <p>Nenhum item adicionado ainda.<br>Use o formulário acima para adicionar itens.</p>
-                </div>
-            `;
-            contador.textContent = '0';
-            document.getElementById('itensJson').value = '[]';
-            return;
-        }
-
-        let html = '';
-        itens.forEach((item, index) => {
-            html += `
-                <div class="item-row" data-id="${item.id}">
-                    <div class="row align-items-center">
-                        <div class="col-md-4 col-8">
-                            <h6 class="mb-1">${item.nome}</h6>
-                            <small class="text-muted">Código: ${item.codigo}</small>
-                        </div>
-                        <!-- NOVA COLUNA PARA OBSERVAÇÃO -->
-                        <div class="col-md-3 col-6">
-                            ${item.observacao ? `
-                                <span class="badge badge-secondary p-2">
-                                    <i class="fas fa-info-circle"></i> ${item.observacao}
-                                </span>
-                            ` : '<small class="text-muted">Sem observação</small>'}
-                        </div>
-                        <div class="col-md-2 col-4 text-center">
-                            <span class="badge badge-info">${item.quantidade} ${item.unidade}</span>
-                        </div>
-                        <div class="col-md-3 col-4 text-right">
-                            <button type="button" class="btn btn-sm btn-outline-primary mr-1" onclick="editarItem(${item.id})" title="Editar item">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button type="button" class="btn btn-sm btn-danger" onclick="removerItem(${item.id})" title="Remover item">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-        
-        container.innerHTML = html;
-        contador.textContent = itens.length;
-        
-        // Atualizar campo hidden com JSON dos itens
-        document.getElementById('itensJson').value = JSON.stringify(itens);
-    }
-
-    function editarItem(id) {
-        const item = itens.find(i => i.id === id);
-        if (!item) return;
-
-        // Preencher campos com dados do item
-        document.getElementById('novoItem').value = item.codigo;
-        document.getElementById('novaObservacao').value = item.observacao; // PREENCHER OBSERVAÇÃO
-        document.getElementById('novaQuantidade').value = item.quantidade;
-        document.getElementById('novaUnidade').value = item.unidade;
-        
-        // Atualizar select2
-        $('#novoItem').val(item.codigo).trigger('change');
-        
-        // Remover item da lista (será readicionado quando clicar em Adicionar)
-        removerItem(id);
-        
-        // Scroll para o formulário
-        document.getElementById('novoItem').scrollIntoView({ behavior: 'smooth' });
-    }
-
-    function removerItem(id) {
-        if (confirm('Deseja remover este item?')) {
-            itens = itens.filter(item => item.id !== id);
-            renderizarItens();
-        }
-    }
-
-    // Restante das funções permanecem iguais...
-    function salvarRascunho() {
-        const dados = coletarDadosFormulario();
-        localStorage.setItem('rascunhoPedido', JSON.stringify(dados));
-        
-        // Feedback visual
-        const btn = event.target;
-        const textoOriginal = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-check"></i> Salvo!';
-        btn.disabled = true;
-        
-        setTimeout(() => {
-            btn.innerHTML = textoOriginal;
-            btn.disabled = false;
-        }, 2000);
-    }
-
-    function limparFormulario() {
-        if (confirm('Deseja limpar todos os dados do formulário?')) {
-            document.getElementById('pedidoCompraForm').reset();
-            itens = [];
-            renderizarItens();
-            $('#novoItem, #novaUnidade, #responsavel, #prioridade, #status').val('').trigger('change');
-            document.getElementById('novaObservacao').value = ''; // LIMPAR OBSERVAÇÃO
-        }
-    }
-
-    function coletarDadosFormulario() {
-        return {
-            responsavel: document.getElementById('responsavel').value,
-            prioridade: document.getElementById('prioridade').value,
-            data_necessidade: document.getElementById('data_necessidade').value,
-            status: document.getElementById('status').value,
-            observacoes: document.getElementById('observacoes').value,
-            itens: itens,
-            obra: 'FAGA'
-        };
-    }
-
-    // Submit do formulário
-    document.getElementById('pedidoCompraForm').addEventListener('submit', function(e) {
-        if (itens.length === 0) {
-            e.preventDefault();
-            alert('Adicione pelo menos um item ao pedido.');
-            return false;
-        }
-        
-        // Atualizar campo hidden antes do submit
-        document.getElementById('itensJson').value = JSON.stringify(itens);
-    });
-
-    // Evento de mudança no select de itens para lidar com novo item e sugestão de unidade
-    document.addEventListener('DOMContentLoaded', function() {
-        const selectItem = document.getElementById('novoItem');
-        const novoItemNomeGroup = document.getElementById('novoItemNomeGroup');
-        selectItem.addEventListener('change', function() {
-            const codigoItem = this.value;
-            // Se a opção for "novo", mostra campo para novo item; caso contrário, oculta
-            if (codigoItem === 'novo') {
-                novoItemNomeGroup.style.display = 'block';
-            } else {
-                novoItemNomeGroup.style.display = 'none';
-            }
-            // Sugerir unidade apenas para itens existentes
-            if (codigoItem && codigoItem !== 'novo') {
-                const unidadeSugerida = sugerirUnidade(codigoItem);
-                document.getElementById('novaUnidade').value = unidadeSugerida;
-            }
-        });
-    });
 </script>
                         <!-- Lista de Itens -->
                         <div class="row mb-4">
@@ -552,32 +361,31 @@
                                 <div id="listaItens">
                                     <div class="text-center text-muted p-4">
                                         <i class="fas fa-box-open fa-3x mb-3"></i>
-                                        <p>Nenhum item adicionado ainda.<br>Use o formulário acima para adicionar itens.</p>
+                                        <p>Nenhum item adicionado ainda.<br>Use o formulÃ¡rio acima para adicionar itens.</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Observações -->
+                        <!-- ObservaÃ§Ãµes -->
                         <div class="row mb-4">
                             <div class="col-12">
                                 <h4 class="section-title">
-                                    <i class="fas fa-comment-alt me-2"></i>Observações
+                                    <i class="fas fa-comment-alt me-2"></i>ObservaÃ§Ãµes
                                 </h4>
                             </div>
                             <div class="col-12">
                                 <div class="form-group">
                                     <textarea class="form-control" id="observacoes" name="observacoes" rows="4" 
-                                              placeholder="Observações adicionais...">{% if pedido %}{{ pedido.observacoes }}{% endif %}</textarea>
+                                              placeholder="ObservaÃ§Ãµes adicionais...">{% if pedido %}{{ pedido.observacoes }}{% endif %}</textarea>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Campo hidden para itens -->
                         <input type="hidden" id="itensJson" name="itens" value="[]">
-                        <input type="hidden" name="obra" value="FAGA">
 
-                        <!-- Botões -->
+                        <!-- BotÃµes -->
                         <div class="row">
                             <div class="col-md-4">
                                 <button type="button" class="btn btn-warning btn-block" onclick="salvarRascunho()">
@@ -602,6 +410,36 @@
         </div>
     </div>
 </div>
+
+<!-- Modal: Nova Obra -->
+<div class="modal fade" id="novaObraModal" tabindex="-1" role="dialog" aria-labelledby="novaObraModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <form id="novaObraForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="novaObraModalLabel">Cadastrar nova obra</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="obra-nome">Nome da obra</label>
+                        <input type="text" class="form-control" id="obra-nome" placeholder="Informe o nome da obra" required>
+                    </div>
+                    <div class="form-group mb-0">
+                        <label for="obra-endereco">EndereÃ§o</label>
+                        <textarea class="form-control" id="obra-endereco" rows="2" placeholder="Rua, nÃºmero, bairro, cidade..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Salvar obra</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock content %}
 
 {% block javascripts %}
@@ -610,6 +448,24 @@
 <script>
     let itens = [];
     let contadorItem = 0;
+
+    const obraSelect = document.getElementById('obra_id');
+    const obraEnderecoText = document.getElementById('obra-endereco-text');
+    const novaObraForm = document.getElementById('novaObraForm');
+    let lastObraValue = obraSelect ? obraSelect.value : '';
+
+    function atualizarEnderecoObra() {
+        if (!obraSelect || !obraEnderecoText) {
+            return;
+        }
+        const option = obraSelect.options[obraSelect.selectedIndex];
+        const endereco = option && option.getAttribute('data-endereco') ? option.getAttribute('data-endereco') : '';
+        if (endereco) {
+            obraEnderecoText.innerHTML = '<i class="fas fa-map-marker-alt mr-1 text-success"></i>' + endereco;
+        } else {
+            obraEnderecoText.textContent = 'Informe ou cadastre uma obra para exibir o endereÃ§o.';
+        }
+    }
 
     // Carregar itens existentes se estiver editando
     {% if pedido and pedido.itens %}
@@ -629,15 +485,85 @@
 
     $(document).ready(function() {
         // Inicializar Select2
-        $('#novoItem, #novaUnidade, #responsavel, #prioridade, #status').select2({
+        $('#novoItem, #novaUnidade, #responsavel, #prioridade, #status, #obra_id').select2({
             theme: 'classic',
             width: '100%'
         });
 
+        if (obraSelect) {
+            atualizarEnderecoObra();
+            $('#obra_id').on('change', function () {
+                if (this.value === 'novo') {
+                    const previousValue = lastObraValue || '';
+                    setTimeout(() => {
+                        $('#obra_id').val(previousValue).trigger('change.select2');
+                    }, 0);
+                    $('#novaObraModal').modal('show');
+                    return;
+                }
+                lastObraValue = this.value;
+                atualizarEnderecoObra();
+            });
+        }
+
+        if (novaObraForm) {
+            $('#novaObraModal').on('shown.bs.modal', function () {
+                novaObraForm.reset();
+                setTimeout(() => document.getElementById('obra-nome').focus(), 100);
+            });
+
+            $('#novaObraModal').on('hidden.bs.modal', function () {
+                if (obraSelect) {
+                    $('#obra_id').val(lastObraValue).trigger('change.select2');
+                    atualizarEnderecoObra();
+                }
+            });
+
+            novaObraForm.addEventListener('submit', async function (event) {
+                event.preventDefault();
+                const nome = document.getElementById('obra-nome').value.trim();
+                const endereco = document.getElementById('obra-endereco').value.trim();
+                if (!nome) {
+                    alert('Informe o nome da obra.');
+                    return;
+                }
+                try {
+                    const resp = await fetch('/api/obras', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ nome, endereco })
+                    });
+                    const out = await resp.json();
+                    if (!resp.ok || !out.success) {
+                        alert(out.message || 'Erro ao salvar obra.');
+                        return;
+                    }
+                    if (obraSelect) {
+                        const valor = String(out.obra_id);
+                        let option = Array.from(obraSelect.options).find(opt => opt.value === valor);
+                        if (!option) {
+                            option = document.createElement('option');
+                            option.value = valor;
+                            const novoOption = Array.from(obraSelect.options).find(opt => opt.value === 'novo');
+                            obraSelect.insertBefore(option, novoOption || null);
+                        }
+                        option.text = out.nome;
+                        option.setAttribute('data-endereco', out.endereco || '');
+                        lastObraValue = valor;
+                        $('#obra_id').val(valor).trigger('change.select2');
+                        atualizarEnderecoObra();
+                    }
+                    $('#novaObraModal').modal('hide');
+                } catch (error) {
+                    alert('Erro ao salvar obra.');
+                }
+            });
+        }
+
         // Renderizar itens existentes
         renderizarItens();
 
-        // Definir data padrão se novo pedido
+        // Definir data padrÃ£o se novo pedido
         {% if not pedido %}
         document.getElementById('data_necessidade').valueAsDate = new Date();
         {% endif %}
@@ -663,8 +589,8 @@
     function sugerirUnidade(codigo) {
         const unidades = {
             'cimento': 'sc',
-            'areia': 'm³',
-            'brita': 'm³',
+            'areia': 'mÂ³',
+            'brita': 'mÂ³',
             'ferro_6mm': 'kg',
             'ferro_8mm': 'kg',
             'ferro_10mm': 'kg',
@@ -673,7 +599,7 @@
             'tijolo_6_furos': 'un',
             'cal': 'sc',
             'argamassa': 'sc',
-            'ceramica': 'm²',
+            'ceramica': 'mÂ²',
             'tinta_pva': 'gl',
             'tinta_acrilica': 'gl'
         };
@@ -710,11 +636,21 @@
             document.getElementById('pedidoCompraForm').reset();
             itens = [];
             renderizarItens();
-            $('#novoItem, #novaUnidade, #responsavel, #prioridade, #status').val('').trigger('change');
+            $('#novoItem, #novaUnidade, #responsavel, #prioridade, #status, #obra_id').val('').trigger('change');
+            const observacaoEl = document.getElementById('novaObservacao');
+            if (observacaoEl) {
+                observacaoEl.value = '';
+            }
+            if (obraSelect) {
+                lastObraValue = '';
+                atualizarEnderecoObra();
+            }
         }
     }
 
     function coletarDadosFormulario() {
+        const obraSelect = document.getElementById('obra_id');
+        const selectedOption = obraSelect ? obraSelect.options[obraSelect.selectedIndex] : null;
         return {
             responsavel: document.getElementById('responsavel').value,
             prioridade: document.getElementById('prioridade').value,
@@ -722,18 +658,27 @@
             status: document.getElementById('status').value,
             observacoes: document.getElementById('observacoes').value,
             itens: itens,
-            obra: 'FAGA'
+            obra_id: obraSelect ? obraSelect.value : '',
+            obra_nome: selectedOption ? (selectedOption.text || '') : '',
+            obra_endereco: selectedOption ? (selectedOption.getAttribute('data-endereco') || '') : ''
         };
     }
 
-    // Submit do formulário
+    // Submit do formulÃ¡rio
     document.getElementById('pedidoCompraForm').addEventListener('submit', function(e) {
         if (itens.length === 0) {
             e.preventDefault();
             alert('Adicione pelo menos um item ao pedido.');
             return false;
         }
-        
+        if (!obraSelect || !obraSelect.value || obraSelect.value === 'novo') {
+            e.preventDefault();
+            alert('Selecione uma obra válida.');
+            return false;
+        }
+        lastObraValue = obraSelect.value;
+        atualizarEnderecoObra();
+
         // Atualizar campo hidden antes do submit
         document.getElementById('itensJson').value = JSON.stringify(itens);
     });
@@ -744,21 +689,41 @@
         const rascunho = localStorage.getItem('rascunhoPedido');
         if (rascunho && confirm('Deseja carregar o rascunho salvo?')) {
             const dados = JSON.parse(rascunho);
-            
+
             // Preencher campos
             document.getElementById('responsavel').value = dados.responsavel;
             document.getElementById('prioridade').value = dados.prioridade;
             document.getElementById('data_necessidade').value = dados.data_necessidade;
             document.getElementById('status').value = dados.status;
             document.getElementById('observacoes').value = dados.observacoes;
-            
+
+            if (obraSelect && dados.obra_id) {
+                const valor = String(dados.obra_id);
+                let option = Array.from(obraSelect.options).find(opt => opt.value === valor);
+                if (!option && dados.obra_nome) {
+                    option = document.createElement('option');
+                    option.value = valor;
+                    option.text = dados.obra_nome;
+                    option.setAttribute('data-endereco', dados.obra_endereco || '');
+                    const novoOption = Array.from(obraSelect.options).find(opt => opt.value === 'novo');
+                    obraSelect.insertBefore(option, novoOption || null);
+                }
+                $('#obra_id').val(valor).trigger('change.select2');
+                lastObraValue = valor;
+                atualizarEnderecoObra();
+            } else {
+                atualizarEnderecoObra();
+            }
+
             // Carregar itens
             itens = dados.itens || [];
-            contadorItem = Math.max(...itens.map(i => i.id), 0);
+            contadorItem = itens.length ? Math.max(...itens.map(i => i.id), 0) : 0;
             renderizarItens();
-            
+
             // Atualizar selects
-            $('#responsavel, #prioridade, #status').trigger('change');
+            $('#responsavel, #prioridade, #status, #obra_id').trigger('change');
+        } else {
+            atualizarEnderecoObra();
         }
     });
     {% endif %}

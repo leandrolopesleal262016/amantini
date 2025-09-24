@@ -1,10 +1,10 @@
 {% extends "layouts/base.html" %}
 
-{% block title %} Tarefas Concluídas {% endblock %}
+{% block title %} Tarefas ConcluÃ­das {% endblock %}
 
 {% block stylesheets %}
 <style>
-    /* Ajusta a aparência da página de tarefas concluídas para seguir o tema verde e reduzir o espaço. */
+    /* Ajusta a aparÃªncia da pÃ¡gina de tarefas concluÃ­das para seguir o tema verde e reduzir o espaÃ§o. */
     .header.bg-gradient-primary {
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
         padding-top: 1.5rem !important;
@@ -31,7 +31,7 @@
         <div class="header-body">
             <div class="row align-items-center">
                 <div class="col-8">
-                    <h6 class="h2 text-white d-inline-block mb-0">Financeiro</h6>
+                    <h6 class="h2 text-white d-inline-block mb-0">Tarefas Concluídas</h6>
                 </div>
             </div>
         </div>
@@ -48,8 +48,8 @@
                         <table class="table align-items-center table-flush">
                             <thead class="thead-light">
                                 <tr>
-                                    <th scope="col">Título</th>
-                                    <th scope="col">Concluída em</th>
+                                    <th scope="col">TÃ­tulo</th>
+                                    <th scope="col">ConcluÃ­da em</th>
                                     <th scope="col">Tempo Gasto</th>
                                 </tr>
                             </thead>
@@ -81,26 +81,26 @@
         </div>
     </div>
 
-    <!-- Modal detalhes de tarefa concluída -->
+    <!-- Modal detalhes de tarefa concluÃ­da -->
     <div class="modal fade" id="completedTaskModal" tabindex="-1" role="dialog" aria-labelledby="completedTaskModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="completedTaskModalLabel">Detalhes da Tarefa Concluída</h5>
+                    <h5 class="modal-title" id="completedTaskModalLabel">Detalhes da Tarefa ConcluÃ­da</h5>
                     <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <div class="modal-body">
-                    <p><strong>Título:</strong> <span id="comp-title"></span></p>
-                    <p><strong>Descrição:</strong> <span id="comp-description"></span></p>
-                    <p><strong>Observações:</strong> <span id="comp-observations"></span></p>
+                    <p><strong>TÃ­tulo:</strong> <span id="comp-title"></span></p>
+                    <p><strong>DescriÃ§Ã£o:</strong> <span id="comp-description"></span></p>
+                    <p><strong>ObservaÃ§Ãµes:</strong> <span id="comp-observations"></span></p>
                     <p><strong>Prioridade:</strong> <span id="comp-priority"></span></p>
-                    <p><strong>Responsável:</strong> <span id="comp-assignee"></span></p>
+                    <p><strong>ResponsÃ¡vel:</strong> <span id="comp-assignee"></span></p>
                     <p><strong>Data de Vencimento:</strong> <span id="comp-due-date"></span></p>
                     <p><strong>Status:</strong> <span id="comp-status"></span></p>
-                    <p><strong>Data de Criação:</strong> <span id="comp-data-criacao"></span></p>
-                    <p><strong>Concluída em:</strong> <span id="comp-data-conclusao"></span></p>
+                    <p><strong>Data de CriaÃ§Ã£o:</strong> <span id="comp-data-criacao"></span></p>
+                    <p><strong>ConcluÃ­da em:</strong> <span id="comp-data-conclusao"></span></p>
                     <p><strong>Tempo Gasto:</strong> <span id="comp-duration"></span></p>
         <p><strong>Anexo:</strong> <span id="comp-attachment"></span></p>
                 </div>
@@ -150,7 +150,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Trata o anexo: exibe link se existir
             const attachmentPath = this.getAttribute('data-attachment-path') || '';
             const attachmentContainer = document.getElementById('comp-attachment');
-            // Limpa o conteúdo anterior
+            // Limpa o conteÃºdo anterior
             attachmentContainer.textContent = '';
             if (attachmentPath) {
                 const link = document.createElement('a');

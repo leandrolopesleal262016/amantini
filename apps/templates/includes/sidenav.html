@@ -43,16 +43,17 @@
           </li>
           <!-- Tarefas Concluídas -->
           <li class="nav-item">
-            <a class="nav-link {% if 'tarefas_concluidas' in segment %} active {% endif %}" href="/tarefas-concluidas">
-              <i class="ni ni-money-coins text-success"></i>
-              <span class="nav-link-text">Financeiro</span>
+            <a class="nav-link {% if 'tarefas_concluidas' in segment %} active {% endif %}" href="{{ url_for('home_blueprint.tarefas_concluidas') }}">
+              <i class="ni ni-archive-2 text-success"></i>
+              <span class="nav-link-text">Tarefas Concluídas</span>
             </a>
           </li>
-          <!-- <li class="nav-item">
-            <a class="nav-link {% if 'tasks' in segment %} active {% endif %}" href="/tables">
-              <i class="ni ni-bullet-list-67 text-info"></i>
-              <span class="nav-link-text">Controle de pedidos</span>
-            </a> -->
+          <!-- Financeiro -->
+          <li class="nav-item">
+            <a class="nav-link {% if 'financeiro' in segment %} active {% endif %}" href="{{ url_for('home_blueprint.financeiro') }}">
+              <i class="ni ni-money-coins text-warning"></i>
+              <span class="nav-link-text">Financeiro</span>
+            </a>
           </li>
           <li class="nav-item">
             <a class="nav-link {% if 'pedidos' in segment %} active {% endif %}" href="{{ url_for('home_blueprint.pedidos_compra') }}">
