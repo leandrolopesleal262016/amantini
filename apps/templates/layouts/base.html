@@ -39,7 +39,32 @@
   <link rel="stylesheet" href="/static/assets/css/argon.css?v=1.2.0" type="text/css">
 
   <style>
-    /* Mobile sidenav styles */
+    .sidenav-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease;
+      z-index: 1025;
+    }
+    #sidenav-main {
+      transition: transform 0.3s ease;
+      z-index: 1030;
+    }
+    body.sidenav-collapsed #sidenav-main {
+      transform: translateX(-260px);
+    }
+    body.sidenav-collapsed .main-content {
+      margin-left: 0 !important;
+    }
+    .sidenav-toggler {
+      cursor: pointer;
+    }
+    body.sidenav-open .sidenav-backdrop {
+      opacity: 1;
+      visibility: visible;
+    }
     @media (max-width: 991.98px) {
       body.sidenav-collapsed #sidenav-main {
         transform: translateX(-100%);
@@ -47,22 +72,8 @@
       body.sidenav-open #sidenav-main {
         transform: translateX(0);
       }
-      #sidenav-main {
-        transition: transform 0.3s ease;
-        z-index: 1030;
-      }
-      .sidenav-backdrop {
-        position: fixed;
-        inset: 0;
-        background: rgba(15, 23, 42, 0.45);
-        opacity: 0;
-        visibility: hidden;
-        transition: opacity 0.3s ease;
-        z-index: 1025;
-      }
-      body.sidenav-open .sidenav-backdrop {
-        opacity: 1;
-        visibility: visible;
+      body.sidenav-open .main-content {
+        margin-left: 0 !important;
       }
     }
   </style>
@@ -95,24 +106,48 @@
       const toggler = document.querySelector('[data-action="sidenav-pin"]');
       const BREAKPOINT = 992;
       let touchStartX = null;
+      let userPinned = false;
 
-      function closeSidenav() {
-        body.classList.remove('sidenav-open');
-        body.classList.add('sidenav-collapsed');
+      function isMobile() {
+        return window.innerWidth < BREAKPOINT;
       }
 
-      function openSidenav() {
-        body.classList.add('sidenav-open');
+      function closeSidenav(manual = false) {
+        if (manual) { userPinned = true; }
+        body.classList.add('sidenav-collapsed');
+        if (isMobile()) {
+          body.classList.remove('sidenav-open');
+        }
+      }
+
+      function openSidenav(manual = false) {
+        if (manual) { userPinned = true; }
         body.classList.remove('sidenav-collapsed');
+        if (isMobile()) {
+          body.classList.add('sidenav-open');
+        } else {
+          body.classList.remove('sidenav-open');
+        }
+      }
+
+      function toggleSidenav() {
+        if (body.classList.contains('sidenav-collapsed')) {
+          openSidenav(true);
+        } else {
+          closeSidenav(true);
+        }
       }
 
       function syncState() {
-        if (window.innerWidth < BREAKPOINT) {
-          if (!body.classList.contains('sidenav-open')) {
+        if (isMobile()) {
+          if (!body.classList.contains('sidenav-open') && !body.classList.contains('sidenav-collapsed')) {
             body.classList.add('sidenav-collapsed');
           }
         } else {
-          body.classList.remove('sidenav-open', 'sidenav-collapsed');
+          body.classList.remove('sidenav-open');
+          if (!userPinned) {
+            body.classList.remove('sidenav-collapsed');
+          }
         }
       }
 
@@ -123,32 +158,37 @@
         toggler.addEventListener('click', function (event) {
           event.preventDefault();
           event.stopPropagation();
-          if (body.classList.contains('sidenav-open')) {
-            closeSidenav();
-          } else {
-            openSidenav();
-          }
+          toggleSidenav();
         });
       }
 
       if (backdrop) {
-        backdrop.addEventListener('click', closeSidenav);
+        backdrop.addEventListener('click', function () { closeSidenav(); });
       }
 
+      document.addEventListener('click', function (event) {
+        if (isMobile() && body.classList.contains('sidenav-open')) {
+          const clickedInside = sidenav.contains(event.target) || (toggler && toggler.contains(event.target));
+          if (!clickedInside) {
+            closeSidenav();
+          }
+        }
+      });
+
       document.addEventListener('touchstart', function (event) {
-        if (event.touches.length !== 1) { return; }
+        if (!isMobile() || event.touches.length !== 1) { return; }
         touchStartX = event.touches[0].clientX;
       }, { passive: true });
 
       document.addEventListener('touchend', function (event) {
-        if (touchStartX === null) { return; }
+        if (!isMobile() || touchStartX === null) { return; }
         const touchEndX = event.changedTouches[0].clientX;
         const deltaX = touchEndX - touchStartX;
         if (Math.abs(deltaX) > 60) {
           if (deltaX < 0 && body.classList.contains('sidenav-open')) {
             closeSidenav();
           } else if (deltaX > 0 && body.classList.contains('sidenav-collapsed') && touchStartX < 40) {
-            openSidenav();
+            openSidenav(true);
           }
         }
         touchStartX = null;
@@ -163,4 +203,7 @@
 </body>
 
 </html>
+
+
+
 
