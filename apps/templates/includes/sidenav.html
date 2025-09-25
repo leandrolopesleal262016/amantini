@@ -4,7 +4,7 @@
     <div class="sidenav-header  align-items-center">
       <a class="navbar-brand" href="/">        
         <!-- Usa o novo logotipo Amantini em vez do logotipo antigo -->
-        <img src="{{ url_for('static', filename='assets/img/brand/logo.png') }}" class="navbar-brand-img" alt="Amantini Logo" style="height: 60px;">
+        <img src="{{ url_for('static', filename='assets/img/brand/logo.png') }}" class="navbar-brand-img" alt="Amantini Logo" style="height: 90px;">
       </a>
     </div>
     <div class="navbar-inner">
@@ -34,18 +34,18 @@
             </a>
           </li>
 
-          <!-- Compras (Orçamentos) -->
+          <!-- Compras (OrÃ§amentos) -->
           <li class="nav-item">
             <a class="nav-link {% if 'compras' in segment %} active {% endif %}" href="/compras">
               <i class="ni ni-cart text-yellow"></i>
               <span class="nav-link-text">Compras</span>
             </a>
           </li>
-          <!-- Tarefas Concluídas -->
+          <!-- Tarefas ConcluÃ­das -->
           <li class="nav-item">
             <a class="nav-link {% if 'tarefas_concluidas' in segment %} active {% endif %}" href="{{ url_for('home_blueprint.tarefas_concluidas') }}">
               <i class="ni ni-archive-2 text-success"></i>
-              <span class="nav-link-text">Tarefas Concluídas</span>
+              <span class="nav-link-text">Tarefas ConcluÃ­das</span>
             </a>
           </li>
           <!-- Financeiro -->
@@ -68,18 +68,18 @@
               <span class="nav-link-text">Financeiro</span>
             </a>
           </li> -->
-          <!-- Orçamentaria -->
+          <!-- OrÃ§amentaria -->
           <!-- <li class="nav-item">
             <a class="nav-link {% if 'reports' in segment %} active {% endif %}" href="/reports">
               <i class="ni ni-paper-diploma text-primary"></i>
-              <span class="nav-link-text">Orçamentaria</span>
+              <span class="nav-link-text">OrÃ§amentaria</span>
             </a>
           </li> -->
-          <!-- Relatórios
+          <!-- RelatÃ³rios
           <li class="nav-item">
             <a class="nav-link {% if 'reports' in segment %} active {% endif %}" href="/reports">
               <i class="ni ni-chart-pie-35 text-orange"></i>
-              <span class="nav-link-text">Relatórios</span>
+              <span class="nav-link-text">RelatÃ³rios</span>
             </a>
           </li> -->
           
@@ -92,9 +92,10 @@
         </h6>
         <!-- Navigation -->
         <ul class="navbar-nav mb-md-3">
-          <!-- Removido item de Página de Produtos -->
+          <!-- Removido item de PÃ¡gina de Produtos -->
         </ul>
       </div>
     </div>
   </div>
 </nav>
+
