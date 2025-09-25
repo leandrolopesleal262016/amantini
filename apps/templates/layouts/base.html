@@ -1,4 +1,4 @@
-﻿<!--
+<!--
 =========================================================
 * Argon Dashboard - v1.2.0
 =========================================================
@@ -37,6 +37,19 @@
   <!-- Page plugins -->
   <!-- Argon CSS -->
   <link rel="stylesheet" href="/static/assets/css/argon.css?v=1.2.0" type="text/css">
+  <link rel="stylesheet" href="/static/assets/css/theme-toggle.css" type="text/css">
+  <script>
+    (function () {
+      try {
+        var storedTheme = localStorage.getItem('amantini-theme');
+        if (storedTheme === 'dark') {
+          document.documentElement.classList.add('theme-dark');
+        }
+      } catch (err) {
+        console.warn('Unable to load saved theme', err);
+      }
+    })();
+  </script>
 
     <style>
     .sidenav-backdrop {
@@ -252,6 +265,73 @@
         touchStartX = null;
       }, { passive: true });
     })();
+  </script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var body = document.body;
+      if (!body) { return; }
+      var root = document.documentElement;
+      var toggleButton = document.getElementById('theme-toggle-btn');
+      var THEME_KEY = 'amantini-theme';
+
+      function currentTheme() {
+        return root.classList.contains('theme-dark') ? 'dark' : 'light';
+      }
+
+      function updateButton(theme) {
+        if (!toggleButton) { return; }
+        if (theme === 'dark') {
+          toggleButton.innerHTML = '<i class="fas fa-sun"></i><span class="d-none d-md-inline">Tema claro</span>';
+          toggleButton.setAttribute('aria-label', 'Ativar tema claro');
+        } else {
+          toggleButton.innerHTML = '<i class="fas fa-moon"></i><span class="d-none d-md-inline">Tema escuro</span>';
+          toggleButton.setAttribute('aria-label', 'Ativar tema escuro');
+        }
+      }
+
+      function applyTheme(theme) {
+        if (theme === 'dark') {
+          root.classList.add('theme-dark');
+          body.classList.add('theme-dark');
+        } else {
+          root.classList.remove('theme-dark');
+          body.classList.remove('theme-dark');
+        }
+        updateButton(theme);
+      }
+
+      var storedTheme = null;
+      try {
+        storedTheme = localStorage.getItem(THEME_KEY);
+      } catch (err) {
+        storedTheme = null;
+      }
+
+      var initialTheme = 'light';
+      if (root.classList.contains('theme-dark')) {
+        initialTheme = 'dark';
+      }
+      if (storedTheme === 'dark') {
+        initialTheme = 'dark';
+      }
+      if (storedTheme === 'light') {
+        initialTheme = 'light';
+      }
+
+      applyTheme(initialTheme);
+
+      if (toggleButton) {
+        toggleButton.addEventListener('click', function () {
+          var nextTheme = currentTheme() === 'dark' ? 'light' : 'dark';
+          applyTheme(nextTheme);
+          try {
+            localStorage.setItem(THEME_KEY, nextTheme);
+          } catch (err) {
+            // ignore storage errors
+          }
+        });
+      }
+    });
   </script>
   <!-- Specific JS goes HERE --> 
   {% block javascripts %}{% endblock javascripts %}
