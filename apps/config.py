@@ -4,7 +4,9 @@ Copyright (c) 2019 - present AppSeed.us
 """
 
 import os
+from urllib.parse import quote_plus
 from decouple import config
+
 
 class Config(object):
 
@@ -13,8 +15,16 @@ class Config(object):
     # Set up the App SECRET_KEY
     SECRET_KEY = config('SECRET_KEY', default='S#perS3crEt_007')
 
-    # This will create a file in <app> FOLDER
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(basedir, 'db.sqlite3')
+    # Database connection defaults (MySQL)
+    DB_ENGINE = config('DB_ENGINE', default='mysql+pymysql')
+    DB_USERNAME = config('DB_USERNAME', default='amantini')
+    DB_PASS = quote_plus(config('DB_PASS', default=''))
+    DB_HOST = config('DB_HOST', default='localhost')
+    DB_PORT = config('DB_PORT', default=3306)
+    DB_NAME = config('DB_NAME', default='amantini')
+
+    _auth_part = f"{DB_USERNAME}:{DB_PASS}" if DB_PASS else DB_USERNAME
+    SQLALCHEMY_DATABASE_URI = f"{DB_ENGINE}://{_auth_part}@{DB_HOST}:{DB_PORT}/{DB_NAME}?charset=utf8mb4"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 
@@ -25,16 +35,6 @@ class ProductionConfig(Config):
     SESSION_COOKIE_HTTPONLY = True
     REMEMBER_COOKIE_HTTPONLY = True
     REMEMBER_COOKIE_DURATION = 3600
-
-    # PostgreSQL database
-    SQLALCHEMY_DATABASE_URI = '{}://{}:{}@{}:{}/{}'.format(
-        config('DB_ENGINE', default='postgresql'),
-        config('DB_USERNAME', default='appseed'),
-        config('DB_PASS', default='pass'),
-        config('DB_HOST', default='localhost'),
-        config('DB_PORT', default=5432),
-        config('DB_NAME', default='appseed-flask')
-    )
 
 
 class DebugConfig(Config):

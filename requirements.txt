@@ -11,4 +11,5 @@ gunicorn==20.1.0
 jinja2==3.0.1
 flask-restx==0.5.1
 werkzeug==2.0.3
-pip==3.6.13
+pymysql==1.1.0
+reportlab==4.0.9

@@ -1,59 +1,28 @@
-# 🚀 GUIA COMPLETO: Flask-Migrate para PythonAnywhere
+# GUIA COMPLETO: Flask-Migrate para PythonAnywhere
 
-# ===== NO SEU AMBIENTE LOCAL =====
+## ===== NO SEU AMBIENTE LOCAL =====
 
-# 1. Backup do banco atual (IMPORTANTE!)
-cp apps/db.sqlite3 apps/db.sqlite3.backup
+1. Faca backup do banco MySQL (ex.: `mysqldump -u usuario -p amantini > backup.sql`).
+2. Inicialize o Flask-Migrate se ainda nao existir: `flask db init`.
+3. Crie a migration inicial que representa o estado atual: `flask db migrate -m "Initial migration"`.
+4. Aplique a migration para confirmar: `flask db upgrade`.
+5. Faca suas alteracoes de modelo normalmente.
+6. Gere novas migrations sempre que mudar os modelos: `flask db migrate -m "Descricao da mudanca"`.
+7. Aplique as migrations localmente: `flask db upgrade`.
+8. Teste a aplicacao local com o banco MySQL.
+9. Faca commit e push das mudancas para o repositorio.
 
-# 2. Inicializar Flask-Migrate
-flask db init
+## ===== NO PYTHONANYWHERE =====
 
-# 3. Criar migration inicial (captura estado atual do banco)
-flask db migrate -m "Initial migration"
+1. Faca pull das mudancas: `git pull origin main`.
+2. Ative o ambiente virtual: `source /home/seuusuario/venv/bin/activate`.
+3. Defina as variaveis `DB_ENGINE`, `DB_USERNAME`, `DB_PASS`, `DB_HOST`, `DB_PORT` e `DB_NAME`.
+4. Aplique as migrations no servidor: `flask db upgrade`.
+5. Reinicie a aplicacao web pelo painel do PythonAnywhere.
 
-# 4. Aplicar migration (não deve mudar nada, mas confirma que funciona)
-flask db upgrade
+## ===== COMANDOS UTEIS PARA O FUTURO =====
 
-# 5. Atualizar o modelo ItemPedido em apps/home/models.py
-# Adicionar: observacao = db.Column(db.String(500), nullable=True)
-
-# 6. Criar migration para o novo campo
-flask db migrate -m "Adicionar campo observacao na tabela itens_pedido"
-
-# 7. Aplicar a nova migration
-flask db upgrade
-
-# 8. Testar se tudo funciona localmente
-
-# 9. Commit e push para o repositório
-git add .
-git commit -m "Adicionar campo observacao e configurar migrations"
-git push origin main
-
-# ===== NO PYTHONANYWHERE =====
-
-# 1. Fazer pull das mudanças
-git pull origin main
-
-# 2. Ativar ambiente virtual
-source /home/seuusuario/venv/bin/activate
-
-# 3. Aplicar migrations no servidor
-flask db upgrade
-
-# 4. Reiniciar aplicação web no dashboard do PythonAnywhere
-
-# ===== COMANDOS ÚTEIS PARA O FUTURO =====
-
-# Ver histórico de migrations
-flask db history
-
-# Ver migration atual
-flask db current
-
-# Reverter para migration anterior (se necessário)
-flask db downgrade
-
-# Criar nova migration (sempre que alterar modelos)
-flask db migrate -m "Descrição da mudança"
-flask db upgrade
+- Ver historico de migrations: `flask db history`
+- Ver a migration atual: `flask db current`
+- Reverter uma migration: `flask db downgrade`
+- Criar nova migration: `flask db migrate -m "Resumo"` e depois `flask db upgrade`
