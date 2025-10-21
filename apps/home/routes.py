@@ -53,13 +53,12 @@ def obras_feature_enabled():
         return False
 
 
-def safe_obras_list(usuario_id):
-    """Return the obras for the user when the feature is available."""
+def safe_obras_list(usuario_id=None):
+    """Return all obras when the feature is available."""
     if not obras_feature_enabled():
         return [], False
     try:
         obras = (Obra.query
-                 .filter_by(usuario_id=usuario_id)
                  .order_by(Obra.nome)
                  .all())
         return obras, True
@@ -131,7 +130,7 @@ def sync_csv_fornecedores(usuario_id):
     rows = load_csv_fornecedores()
     if not rows:
         return 0, 0
-    existing = Fornecedor.query.filter_by(usuario_id=usuario_id).all()
+    existing = Fornecedor.query.all()
     by_cnpj = {}
     by_name = {}
     for fornecedor in existing:
@@ -250,14 +249,16 @@ def download_orcamento(filename):
 @login_required
 def pedidos_compra():
     """Lista todos os pedidos de compra"""
-    pedidos = PedidoCompra.query.filter_by(usuario_id=current_user.id).order_by(PedidoCompra.data_criacao.desc()).all()
+    pedidos = (PedidoCompra.query
+               .order_by(PedidoCompra.data_criacao.desc())
+               .all())
     return render_template('home/pedidos_compra_lista.html', pedidos=pedidos, segment='pedidos')
 
 @blueprint.route('/pedidos-compra/novo')
 @login_required
 def novo_pedido_compra():
     """Formulário para novo pedido de compra"""
-    obras, obras_enabled = safe_obras_list(current_user.id)
+    obras, obras_enabled = safe_obras_list()
     return render_template(
         'home/pedido_compra_form.html',
         obras=obras,
@@ -281,7 +282,7 @@ def criar_pedido_compra():
                 obra_id = int(obra_id_raw)
             except (TypeError, ValueError):
                 raise ValueError('Obra selecionada é inválida.')
-            obra = Obra.query.filter_by(id=obra_id, usuario_id=current_user.id).first()
+            obra = Obra.query.filter_by(id=obra_id).first()
             if not obra:
                 raise ValueError('Obra selecionada não encontrada.')
 
@@ -344,7 +345,7 @@ def criar_pedido_compra():
 @login_required
 def ver_pedido_compra(pedido_id):
     """Visualiza um pedido específico"""
-    pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
+    pedido = PedidoCompra.query.filter_by(id=pedido_id).first_or_404()
     dias_decorridos = None
     if pedido.data_criacao:
         try:
@@ -359,7 +360,7 @@ def ver_pedido_compra(pedido_id):
 @login_required
 def pedido_compra_pdf(pedido_id):
     """Gera um PDF com os dados completos do pedido de compra."""
-    pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
+    pedido = PedidoCompra.query.filter_by(id=pedido_id).first_or_404()
 
     buffer = io.BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=A4)
@@ -436,9 +437,9 @@ def editar_pedido_compra(pedido_id):
 
     """Edita um pedido de compra"""
 
-    pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
+    pedido = PedidoCompra.query.filter_by(id=pedido_id).first_or_404()
 
-    obras, obras_enabled = safe_obras_list(current_user.id)
+    obras, obras_enabled = safe_obras_list()
 
     return render_template(
 
@@ -467,7 +468,7 @@ def editar_pedido_compra(pedido_id):
 def atualizar_pedido_compra(pedido_id):
     """Atualiza um pedido de compra"""
     try:
-        pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
+        pedido = PedidoCompra.query.filter_by(id=pedido_id).first_or_404()
         use_obras = obras_feature_enabled()
 
         if use_obras:
@@ -478,7 +479,7 @@ def atualizar_pedido_compra(pedido_id):
                 obra_id = int(obra_id_raw)
             except (TypeError, ValueError):
                 raise ValueError('Obra selecionada é inválida.')
-            obra = Obra.query.filter_by(id=obra_id, usuario_id=current_user.id).first()
+            obra = Obra.query.filter_by(id=obra_id).first()
             if not obra:
                 raise ValueError('Obra selecionada não encontrada.')
 
@@ -545,7 +546,7 @@ def api_criar_pedido():
                 obra_id = int(obra_id_raw)
             except (TypeError, ValueError):
                 raise ValueError('Obra selecionada é inválida.')
-            obra = Obra.query.filter_by(id=obra_id, usuario_id=current_user.id).first()
+            obra = Obra.query.filter_by(id=obra_id).first()
             if not obra:
                 raise ValueError('Obra selecionada não encontrada.')
 
@@ -647,7 +648,7 @@ def api_update_task_status(task_id):
     data = request.get_json() or {}
     new_status = data.get('status')
     new_position = data.get('posicao', 0)
-    task = Task.query.filter_by(id=task_id, usuario_id=current_user.id).first_or_404()
+    task = Task.query.filter_by(id=task_id).first_or_404()
     # Validar status válido
     valid_statuses = ['Pendente', 'Em Progresso', 'Entregue', 'Aguardando Nota/Boleto']
     if new_status not in valid_statuses:
@@ -668,7 +669,7 @@ def api_update_task_status(task_id):
 @login_required
 def api_update_task(task_id):
     data = request.get_json() or {}
-    task = Task.query.filter_by(id=task_id, usuario_id=current_user.id).first_or_404()
+    task = Task.query.filter_by(id=task_id).first_or_404()
     # Campos permitidos para atualização
     title = data.get('title')
     description = data.get('description')
@@ -716,7 +717,7 @@ def api_complete_task(task_id):
 
 
     # Busca a tarefa do usuário logado
-    task = Task.query.filter_by(id=task_id, usuario_id=current_user.id).first_or_404()
+    task = Task.query.filter_by(id=task_id).first_or_404()
 
     # Dados podem vir via multipart/form-data (com arquivo) ou JSON
     data = request.form if request.form else (request.get_json() or {})
@@ -812,7 +813,6 @@ def tarefas_concluidas():
     """
     # Buscar tarefas concluídas ordenadas por data de conclusão decrescente
     completadas = (CompletedTask.query
-                   .filter_by(usuario_id=current_user.id)
                    .order_by(CompletedTask.data_conclusao.desc())
                    .all())
     # Converter duração para dias inteiros em vez de HH:MM:SS
@@ -839,16 +839,14 @@ def tarefas_concluidas():
 @blueprint.route('/compras')
 @login_required
 def compras():
-    """Exibe a página de compras (orçamentos) com todos os registros do usuário."""
+    """Exibe a página de compras (orçamentos) com todos os registros disponíveis."""
     sync_csv_fornecedores(current_user.id)
     # Recupera todas as compras do usuário atual
     compras = (Compra.query
-               .filter_by(usuario_id=current_user.id)
                .order_by(Compra.data_criacao.desc())
                .all())
     # Recupera fornecedores do usuário atual para popular o formulário
     fornecedores = (Fornecedor.query
-                    .filter_by(usuario_id=current_user.id)
                     .order_by(Fornecedor.nome)
                     .all())
     return render_template('home/compras.html', compras=compras, fornecedores=fornecedores, segment='compras')
@@ -869,7 +867,6 @@ def api_criar_obra():
     endereco = endereco[:255] if endereco else None
 
     existente = (Obra.query
-                 .filter_by(usuario_id=current_user.id)
                  .filter(Obra.nome.ilike(nome))
                  .first())
     if existente:
@@ -960,7 +957,7 @@ def api_criar_compra():
     else:
         if not fornecedor_id:
             return jsonify({'success': False, 'message': 'Fornecedor é obrigatório.'}), 400
-        fornecedor = Fornecedor.query.filter_by(id=int(fornecedor_id), usuario_id=current_user.id).first()
+        fornecedor = Fornecedor.query.filter_by(id=int(fornecedor_id)).first()
         if not fornecedor:
             return jsonify({'success': False, 'message': 'Fornecedor não encontrado.'}), 404
     # Processa arquivo de anexo, se houver
@@ -1000,7 +997,6 @@ def pedidos_compra_kanban():
     """Exibe o quadro Kanban de pedidos de compra"""
     # Obtém todos os pedidos do usuário atual ordenados por posição para cada status
     pedidos = (PedidoCompra.query
-               .filter_by(usuario_id=current_user.id)
                .order_by(PedidoCompra.posicao)
                .all())
     return render_template('home/pedidos_compra_kanban.html', pedidos=pedidos, segment='pedidos')
@@ -1014,7 +1010,7 @@ def atualizar_status_pedido(pedido_id):
     novo_status = data.get('status')
     nova_posicao = data.get('posicao', 0)
     # Garantir que o pedido existe e pertence ao usuário atual
-    pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
+    pedido = PedidoCompra.query.filter_by(id=pedido_id).first_or_404()
     # Validar o status
     if novo_status not in ['solicitado', 'aprovado', 'em_compra', 'entregue']:
         return jsonify({'success': False, 'message': 'Status inválido'}), 400
@@ -1079,10 +1075,9 @@ def contacts():
 def tasks():
     """
     Exibe o painel de tarefas com suporte a movimentação persistente.
-    As tarefas são carregadas do banco de dados e filtradas por usuário, ordenadas pela posição.
+    As tarefas são carregadas do banco de dados e ordenadas pela posição.
     """
     tasks = (Task.query
-             .filter_by(usuario_id=current_user.id)
              .order_by(Task.posicao)
              .all())
     return render_template('home/tasks.html', tasks=tasks, segment='tasks')
@@ -1155,7 +1150,7 @@ def delete_contact(id):
 def financeiro():
     """Lista tarefas concluídas que aguardam nota ou boleto."""
     aguardando = (CompletedTask.query
-                  .filter_by(usuario_id=current_user.id, status='Aguardando Nota/Boleto')
+                  .filter_by(status='Aguardando Nota/Boleto')
                   .order_by(CompletedTask.data_conclusao.desc())
                   .all())
     for tarefa in aguardando:
