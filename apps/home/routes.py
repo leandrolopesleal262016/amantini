@@ -1,4 +1,4 @@
-# -*- encoding: utf-8 -*-
+﻿# -*- encoding: utf-8 -*-
 """
 Copyright (c) 2019 - present AppSeed.us
 """
@@ -35,6 +35,7 @@ from apps.authentication.models import (
     Fornecedor,
     Compra,
     Material,
+    Users,
 )
 
 DATA_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'data'))
@@ -221,6 +222,12 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 # Diretório separado para arquivos de orçamentos (compras)
 ORCAMENTO_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'media', 'orcamentos'))
 os.makedirs(ORCAMENTO_FOLDER, exist_ok=True)
+# Diretório para avatares de usuário
+AVATAR_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'media', 'avatars'))
+os.makedirs(AVATAR_FOLDER, exist_ok=True)
+# Diretório para imagens de capa de perfil
+COVER_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'media', 'covers'))
+os.makedirs(COVER_FOLDER, exist_ok=True)
 
 @blueprint.route('/uploads/<path:filename>')
 @login_required
@@ -245,6 +252,18 @@ def download_attachment(filename):
 def download_orcamento(filename):
     """Serve um arquivo anexo de orçamento armazenado em ORCAMENTO_FOLDER."""
     return send_from_directory(ORCAMENTO_FOLDER, filename, as_attachment=True)
+
+@blueprint.route('/avatars/<path:filename>')
+@login_required
+def download_avatar(filename):
+    """Serve avatar de usuário."""
+    return send_from_directory(AVATAR_FOLDER, filename, as_attachment=False)
+
+@blueprint.route('/covers/<path:filename>')
+@login_required
+def download_cover(filename):
+    """Serve imagem de capa de usuário."""
+    return send_from_directory(COVER_FOLDER, filename, as_attachment=False)
 
 @blueprint.route('/pedidos-compra')
 @login_required
@@ -1181,7 +1200,55 @@ def route_template(template):
 
     except:
         return render_template('home/page-500.html'), 500
-    
+
+
+@blueprint.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    """Exibe e atualiza os dados de perfil do usuário logado."""
+    user = current_user
+    if request.method == 'POST':
+        try:
+            user.first_name = request.form.get('first_name', '').strip() or None
+            user.last_name = request.form.get('last_name', '').strip() or None
+            user.phone = request.form.get('phone', '').strip() or None
+            user.address = request.form.get('address', '').strip() or None
+            user.city = request.form.get('city', '').strip() or None
+            user.country = request.form.get('country', '').strip() or None
+            user.postal_code = request.form.get('postal_code', '').strip() or None
+            user.bio = request.form.get('bio', '').strip() or None
+
+            # Foto de perfil
+            avatar_file = request.files.get('avatar') if request.files else None
+            if avatar_file and avatar_file.filename:
+                filename = secure_filename(avatar_file.filename)
+                timestamp = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+                ext = os.path.splitext(filename)[1]
+                final_name = f"user{user.id}_{timestamp}{ext}"
+                save_path = os.path.join(AVATAR_FOLDER, final_name)
+                avatar_file.save(save_path)
+                user.avatar_path = final_name
+
+            # Imagem de capa
+            cover_file = request.files.get('cover') if request.files else None
+            if cover_file and cover_file.filename:
+                filename = secure_filename(cover_file.filename)
+                timestamp = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+                ext = os.path.splitext(filename)[1]
+                final_name = f"cover{user.id}_{timestamp}{ext}"
+                save_path = os.path.join(COVER_FOLDER, final_name)
+                cover_file.save(save_path)
+                user.cover_path = final_name
+
+            db.session.commit()
+            flash('Perfil atualizado com sucesso.', 'success')
+        except Exception as exc:
+            db.session.rollback()
+            flash(f'Erro ao salvar perfil: {exc}', 'danger')
+        return redirect(url_for('home_blueprint.profile'))
+
+    return render_template('home/profile.html', user=user, segment='profile')
+
 @blueprint.route('/contacts/edit/<int:id>', methods=['POST'])
 @login_required
 def edit_contact(id):

@@ -13,6 +13,16 @@ class Users(db.Model, UserMixin):
     username = db.Column(db.String(64), unique=True)
     email = db.Column(db.String(64), unique=True)
     password = db.Column(db.LargeBinary)
+    first_name = db.Column(db.String(64), nullable=True)
+    last_name = db.Column(db.String(64), nullable=True)
+    phone = db.Column(db.String(32), nullable=True)
+    address = db.Column(db.String(255), nullable=True)
+    city = db.Column(db.String(64), nullable=True)
+    country = db.Column(db.String(64), nullable=True)
+    postal_code = db.Column(db.String(20), nullable=True)
+    bio = db.Column(db.Text, nullable=True)
+    avatar_path = db.Column(db.String(255), nullable=True)
+    cover_path = db.Column(db.String(255), nullable=True)
 
     def __init__(self, **kwargs):
         for property, value in kwargs.items():

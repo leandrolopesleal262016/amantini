@@ -6,39 +6,49 @@
 
 <div class="header pb-6 d-flex align-items-center" 
      style="min-height: 500px; background-image: url(/static/assets/img/theme/profile-cover.jpg); background-size: cover; background-position: center top;">
-  <!-- Mask -->
   <span class="mask bg-gradient-default opacity-8"></span>
-  <!-- Header container -->
   <div class="container-fluid d-flex align-items-center">
     <div class="row">
       <div class="col-lg-7 col-md-10">
         <h1 class="display-2 text-white"> 
-          Olá {{ current_user.username }}
+          Olá {{ user.username }}
         </h1>
-        <p class="text-white mt-0 mb-5">Esta é a sua página de perfil. Você pode ver o progresso do seu trabalho e gerenciar seus projetos ou tarefas atribuídas.</p>
-        <a href="#!" class="btn btn-neutral">Editar perfil</a>
+        <p class="text-white mt-0 mb-5">Aqui você pode manter seu perfil atualizado.</p>
+        <a href="#profile-form" class="btn btn-neutral">Editar perfil</a>
       </div>
     </div>
   </div>
 </div>
-<!-- Page content -->
+
 <div class="container-fluid mt--6">
   <div class="row">
     <div class="col-xl-4 order-xl-2">
       <div class="card card-profile">
-        <img src="/static/assets/img/theme/img-1-1000x600.jpg" alt="Image placeholder" class="card-img-top">
+        {% set cover_file = user.cover_path %}
+        {% if cover_file %}
+        <img src="{{ url_for('home_blueprint.download_cover', filename=cover_file) }}" alt="Imagem de capa" class="card-img-top">
+        {% else %}
+        <img src="/static/assets/img/theme/img-1-1000x600.jpg" alt="Imagem de capa" class="card-img-top">
+        {% endif %}
         <div class="row justify-content-center">
           <div class="col-lg-3 order-lg-2">
             <div class="card-profile-image">
               <a href="#">
-                <img src="/static/assets/img/theme/team-4.jpg" class="rounded-circle">
+                {% set avatar_file = user.avatar_path %}
+                {% if avatar_file %}
+                <img src="{{ url_for('home_blueprint.download_avatar', filename=avatar_file) }}" class="rounded-circle" alt="Avatar">
+                {% else %}
+                <span class="avatar rounded-circle bg-default text-white d-flex align-items-center justify-content-center" style="width:128px;height:128px;">
+                  <i class="ni ni-circle-08" style="font-size:48px;"></i>
+                </span>
+                {% endif %}
               </a>
             </div>
           </div>
         </div>
         <div class="card-header text-center border-0 pt-8 pt-md-4 pb-0 pb-md-4">
           <div class="d-flex justify-content-between">
-            <a href="#" class="btn btn-sm btn-info  mr-4 ">Conectar</a>
+            <a href="#" class="btn btn-sm btn-info  mr-4">Conectar</a>
             <a href="#" class="btn btn-sm btn-default float-right">Mensagem</a>
           </div>
         </div>
@@ -63,48 +73,57 @@
           </div>
           <div class="text-center">
             <h5 class="h3">
-              {{ current_user.username }}
+              {% if user.first_name or user.last_name %}
+              {{ user.first_name or '' }} {{ user.last_name or '' }}
+              {% else %}
+              {{ user.username }}
+              {% endif %}
             </h5>
             <div class="h5 font-weight-300">
-              {{ current_user.email }}
+              {{ user.email }}
             </div>
+            {% if user.phone %}
             <div class="h5 mt-4">
-              <i class="ni business_briefcase-24 mr-2"></i> Desenvolvedor - Especialista em inteligência Artificial
+              <i class="ni ni-mobile-button mr-2"></i> {{ user.phone }}
             </div>
-            <div>
-              <i class="ni education_hat mr-2"></i>Formado Mecatrônica / Analise e Desenvolvimento de Sistemas com diversas especializações  
+            {% endif %}
+            {% if user.bio %}
+            <div class="mt-3">
+              <i class="ni ni-notification-70 mr-2"></i>{{ user.bio }}
             </div>
+            {% endif %}
           </div>
         </div>
       </div>
     </div>
+
     <div class="col-xl-8 order-xl-1">
       <div class="card">
         <div class="card-header">
           <div class="row align-items-center">
             <div class="col-8">
-              <h3 class="mb-0">Editar perfil </h3>
+              <h3 class="mb-0">Editar perfil</h3>
             </div>
             <div class="col-4 text-right">
-              <a href="#!" class="btn btn-sm btn-primary">Configuraçãoes</a>
+              <a href="#profile-form" class="btn btn-sm btn-primary">Ir para formulário</a>
             </div>
           </div>
         </div>
         <div class="card-body">
-          <form>
-            <h6 class="heading-small text-muted mb-4">Informações de Usuario</h6>
+          <form id="profile-form" method="POST" action="{{ url_for('home_blueprint.profile') }}" enctype="multipart/form-data">
+            <h6 class="heading-small text-muted mb-4">Informações de Usuário</h6>
             <div class="pl-lg-4">
               <div class="row">
                 <div class="col-lg-6">
                   <div class="form-group">
-                    <label class="form-control-label" for="input-username">Nome Usuario</label>
-                    <input type="text" id="input-username" class="form-control" placeholder="Username" value="{{ current_user.username }}">
+                    <label class="form-control-label" for="input-username">Usuário</label>
+                    <input type="text" id="input-username" class="form-control" value="{{ user.username }}" disabled>
                   </div>
                 </div>
                 <div class="col-lg-6">
                   <div class="form-group">
                     <label class="form-control-label" for="input-email">Email</label>
-                    <input type="email" id="input-email" class="form-control" placeholder="{{ current_user.email }}">
+                    <input type="email" id="input-email" class="form-control" value="{{ user.email }}" disabled>
                   </div>
                 </div>
               </div>
@@ -112,26 +131,47 @@
                 <div class="col-lg-6">
                   <div class="form-group">
                     <label class="form-control-label" for="input-first-name">Primeiro nome</label>
-                    <input type="text" id="input-first-name" class="form-control" placeholder="Primeiro nome" value="Jonas">
+                    <input type="text" name="first_name" id="input-first-name" class="form-control" placeholder="Primeiro nome" value="{{ user.first_name or '' }}">
                   </div>
                 </div>
                 <div class="col-lg-6">
                   <div class="form-group">
-                    <label class="form-control-label" for="input-last-name">Ultimo nome</label>
-                    <input type="text" id="input-last-name" class="form-control" placeholder="Ultimo nome" value="Silva">
+                    <label class="form-control-label" for="input-last-name">Último nome</label>
+                    <input type="text" name="last_name" id="input-last-name" class="form-control" placeholder="Último nome" value="{{ user.last_name or '' }}">
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-lg-6">
+                  <div class="form-group">
+                    <label class="form-control-label" for="input-phone">Telefone</label>
+                    <input type="text" name="phone" id="input-phone" class="form-control" placeholder="(xx) xxxxx-xxxx" value="{{ user.phone or '' }}">
+                  </div>
+                </div>
+                <div class="col-lg-6">
+                  <div class="form-group">
+                    <label class="form-control-label" for="input-avatar">Foto de perfil</label>
+                    <input type="file" name="avatar" id="input-avatar" class="form-control">
+                    <small class="text-muted">PNG/JPG de até ~2MB.</small>
+                  </div>
+                </div>
+                <div class="col-lg-6">
+                  <div class="form-group">
+                    <label class="form-control-label" for="input-cover">Imagem de capa</label>
+                    <input type="file" name="cover" id="input-cover" class="form-control">
+                    <small class="text-muted">PNG/JPG de até ~2MB.</small>
                   </div>
                 </div>
               </div>
             </div>
             <hr class="my-4" />
-            <!-- Address -->
             <h6 class="heading-small text-muted mb-4">Informações de contato</h6>
             <div class="pl-lg-4">
               <div class="row">
                 <div class="col-md-12">
                   <div class="form-group">
                     <label class="form-control-label" for="input-address">Endereço</label>
-                    <input id="input-address" class="form-control" placeholder="Endereço" value="Rua treze de maio, nr. 8 Bl 1, Sc 1, Ap 09" type="text">
+                    <input name="address" id="input-address" class="form-control" placeholder="Endereço" value="{{ user.address or '' }}" type="text">
                   </div>
                 </div>
               </div>
@@ -139,31 +179,33 @@
                 <div class="col-lg-4">
                   <div class="form-group">
                     <label class="form-control-label" for="input-city">Cidade</label>
-                    <input type="text" id="input-city" class="form-control" placeholder="Cidade" value="Bauru">
+                    <input type="text" name="city" id="input-city" class="form-control" placeholder="Cidade" value="{{ user.city or '' }}">
                   </div>
                 </div>
                 <div class="col-lg-4">
                   <div class="form-group">
                     <label class="form-control-label" for="input-country">País</label>
-                    <input type="text" id="input-country" class="form-control" placeholder="País" value="Brasil">
+                    <input type="text" name="country" id="input-country" class="form-control" placeholder="País" value="{{ user.country or '' }}">
                   </div>
                 </div>
                 <div class="col-lg-4">
                   <div class="form-group">
-                    <label class="form-control-label" for="input-country">CEP</label>
-                    <input type="number" id="input-postal-code" class="form-control" placeholder="CEP">
+                    <label class="form-control-label" for="input-postal-code">CEP</label>
+                    <input type="text" name="postal_code" id="input-postal-code" class="form-control" placeholder="CEP" value="{{ user.postal_code or '' }}">
                   </div>
                 </div>
               </div>
             </div>
             <hr class="my-4" />
-            <!-- Description -->
             <h6 class="heading-small text-muted mb-4">Sobre mim</h6>
             <div class="pl-lg-4">
               <div class="form-group">
                 <label class="form-control-label">Sobre mim</label>
-                <textarea rows="4" class="form-control" placeholder="A few words about you ...">Sou uma pessoa criativa, comunicativa e adoro tecnologia </textarea>
+                <textarea rows="4" name="bio" class="form-control" placeholder="Fale sobre você...">{{ user.bio or '' }}</textarea>
               </div>
+            </div>
+            <div class="pl-lg-4">
+              <button type="submit" class="btn btn-primary">Salvar</button>
             </div>
           </form>
         </div>
@@ -177,5 +219,4 @@
 
 {% endblock content %}
 
-<!-- Specific JS goes HERE --> 
 {% block javascripts %}{% endblock javascripts %}

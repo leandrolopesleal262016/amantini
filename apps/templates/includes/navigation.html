@@ -199,8 +199,13 @@
         <li class="nav-item dropdown">
           <a class="nav-link pr-0" href="#" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
             <div class="media align-items-center">
-              <span class="avatar avatar-sm rounded-circle">
-                <img alt="Image placeholder" src="/static/assets/img/theme/team-4.jpg">
+              <span class="avatar avatar-sm rounded-circle d-flex align-items-center justify-content-center bg-default text-white">
+                {% set avatar_file = current_user.avatar_path %}
+                {% if avatar_file %}
+                <img alt="Avatar" src="{{ url_for('home_blueprint.download_avatar', filename=avatar_file) }}">
+                {% else %}
+                <i class="ni ni-circle-08"></i>
+                {% endif %}
               </span>
               <div class="media-body  ml-2  d-none d-lg-block">
                 <span class="mb-0 text-sm  font-weight-bold">
@@ -213,7 +218,7 @@
             <div class="dropdown-header noti-title">
               <h6 class="text-overflow m-0">Welcome!</h6>
             </div>
-            <a href="/profile.html" class="dropdown-item">
+            <a href="{{ url_for('home_blueprint.profile') }}" class="dropdown-item">
               <i class="ni ni-single-02"></i>
               <span>My profile</span>
             </a>
