@@ -34,6 +34,7 @@ from apps.authentication.models import (
     CompletedTask,
     Fornecedor,
     Compra,
+    Material,
 )
 
 DATA_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'data'))
@@ -258,11 +259,15 @@ def pedidos_compra():
 @login_required
 def novo_pedido_compra():
     """Formulário para novo pedido de compra"""
+    materiais = (Material.query
+                 .order_by(Material.nome)
+                 .all())
     obras, obras_enabled = safe_obras_list()
     return render_template(
         'home/pedido_compra_form.html',
         obras=obras,
         obras_enabled=obras_enabled,
+        materiais=materiais,
         obra_nome_padrao='FAGA',
         segment='pedidos'
     )
@@ -438,6 +443,9 @@ def editar_pedido_compra(pedido_id):
     """Edita um pedido de compra"""
 
     pedido = PedidoCompra.query.filter_by(id=pedido_id).first_or_404()
+    materiais = (Material.query
+                 .order_by(Material.nome)
+                 .all())
 
     obras, obras_enabled = safe_obras_list()
 
@@ -450,6 +458,8 @@ def editar_pedido_compra(pedido_id):
         obras=obras,
 
         obras_enabled=obras_enabled,
+
+        materiais=materiais,
 
         obra_atual=pedido.obra_rel,
 
@@ -924,6 +934,64 @@ def api_criar_fornecedor():
     db.session.add(fornecedor)
     db.session.commit()
     return jsonify({'success': True, 'fornecedor_id': fornecedor.id, 'nome': fornecedor.nome})
+
+
+@blueprint.route('/api/materiais', methods=['GET', 'POST'])
+@login_required
+def api_materiais():
+    """Lista materiais ou cadastra um novo material para uso no combo de itens."""
+    try:
+        if request.method == 'GET':
+            materiais = (Material.query
+                         .order_by(Material.nome)
+                         .all())
+            return jsonify({
+                'success': True,
+                'materiais': [
+                    {
+                        'id': m.id,
+                        'nome': m.nome,
+                        'unidade': m.unidade or 'un'
+                    } for m in materiais
+                ]
+            })
+
+        data = request.get_json() or {}
+        nome = (data.get('nome') or '').strip()
+        unidade = (data.get('unidade') or 'un').strip() or 'un'
+
+        if not nome:
+            return jsonify({'success': False, 'message': 'Nome do material é obrigatório.'}), 400
+
+        existente = (Material.query
+                     .filter(Material.nome.ilike(nome))
+                     .first())
+        if existente:
+            if unidade and not existente.unidade:
+                existente.unidade = unidade
+                db.session.commit()
+            return jsonify({
+                'success': True,
+                'material_id': existente.id,
+                'nome': existente.nome,
+                'unidade': existente.unidade or 'un',
+                'ja_existia': True
+            })
+
+        material = Material(nome=nome, unidade=unidade)
+        db.session.add(material)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'material_id': material.id,
+            'nome': material.nome,
+            'unidade': material.unidade or 'un',
+            'ja_existia': False
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 
 @blueprint.route('/api/compras', methods=['POST'])

@@ -238,6 +238,18 @@ class Compra(db.Model):
     def __repr__(self):
         return f'<Compra {self.id} - {self.valor}>'
 
+
+class Material(db.Model):
+    __tablename__ = 'materiais'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(200), unique=True, nullable=False)
+    unidade = db.Column(db.String(20), nullable=True, default='un')
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<Material {self.id} - {self.nome}>'
+
 @login_manager.user_loader
 def user_loader(id):
     return Users.query.filter_by(id=id).first()
