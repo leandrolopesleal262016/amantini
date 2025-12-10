@@ -305,8 +305,7 @@
                     <div class="form-group">
                         <label class="form-control-label">Item</label>
                         <select class="form-control" id="novoItem" data-toggle="select" data-size="7">
-                            <option value="">Selecione um item...</option>
-                            <option value="novo">+ Cadastrar novo item...</option>
+                            <option value=""></option>
                             {% for material in materiais or [] %}
                             <option value="{{ material.nome|e }}" data-unidade="{{ material.unidade or 'un' }}">{{ material.nome }}</option>
                             {% endfor %}
@@ -314,19 +313,13 @@
                     </div>
                 </div>
                 
-                <!-- Coluna de observaÃ§Ã£o e cadastro de novo item -->
+                <!-- Coluna de observação -->
                 <div class="col-md-3">
                     <div class="form-group">
-                        <label class="form-control-label">ObservaÃ§Ã£o</label>
+                        <label class="form-control-label">Observação</label>
                         <input type="text" class="form-control" id="novaObservacao" 
                                placeholder="Ex: Cor branca, Marca especÃ­fica...">
-                        <small class="text-muted">Cor, marca, especificaÃ§Ã£o...</small>
-                        <!-- Campo para cadastrar novo item, exibido somente quando a opÃ§Ã£o 'Incluir novo item...' Ã© selecionada -->
-                        <div id="novoItemNomeGroup" style="display:none; margin-top:0.5rem;">
-                            <label class="form-control-label">Novo item</label>
-                            <input type="text" class="form-control" id="novoItemNome" placeholder="Digite o nome do novo item">
-                            <small class="text-muted">Nome do item que nÃ£o estÃ¡ na lista</small>
-                        </div>
+                        <small class="text-muted">Cor, marca, especificação...</small>
                     </div>
                 </div>
                 
@@ -509,21 +502,16 @@
         if (!select) {
             return;
         }
-        const jaExiste = Array.from(select.options).some(opt => opt.value === material.nome);
-        if (jaExiste) {
-            return;
-        }
-        const option = document.createElement('option');
-        option.value = material.nome;
-        option.textContent = material.nome;
-        option.setAttribute('data-unidade', material.unidade || 'un');
-        const novoOption = Array.from(select.options).find(opt => opt.value === 'novo');
-        if (novoOption && novoOption.parentNode) {
-            novoOption.parentNode.insertBefore(option, novoOption.nextSibling);
-        } else {
+        const nomeLower = material.nome.toLowerCase();
+        const jaExiste = Array.from(select.options).some(opt => (opt.value || '').toLowerCase() === nomeLower);
+        if (!jaExiste) {
+            const option = document.createElement('option');
+            option.value = material.nome;
+            option.textContent = material.nome;
+            option.setAttribute('data-unidade', material.unidade || 'un');
             select.appendChild(option);
         }
-        const existeNoArray = materiaisDisponiveis.some(m => m.nome === material.nome);
+        const existeNoArray = materiaisDisponiveis.some(m => (m.nome || '').toLowerCase() === nomeLower);
         if (!existeNoArray) {
             materiaisDisponiveis.push({
                 id: material.id || null,
@@ -531,19 +519,20 @@
                 unidade: material.unidade || 'un'
             });
         }
-        $('#novoItem').trigger('change.select2');
     }
 
     function salvarMaterial(nome, unidade) {
         fetch('/api/materiais', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ nome, unidade })
         })
         .then(resp => resp.json().then(data => ({ ok: resp.ok, data })))
         .then(({ ok, data }) => {
             if (!ok || !data.success) {
-                console.warn('Erro ao salvar material:', data && data.message);
+                const msg = (data && data.message) ? data.message : 'Erro ao salvar material.';
+                alert(msg);
                 return;
             }
             inserirMaterialNaLista({
@@ -580,7 +569,26 @@
         }
         $(select2Targets.join(', ')).select2({
             theme: 'classic',
-            width: '100%'
+            width: '100%',
+            allowClear: true,
+            placeholder: '',
+            tags: true,
+            selectOnClose: true,
+            createTag: function (params) {
+                const term = $.trim(params.term);
+                if (term === '') {
+                    return null;
+                }
+                return {
+                    id: term,
+                    text: term,
+                    newTag: true
+                };
+            },
+            insertTag: function (data, tag) {
+                // Mantém o novo item no topo para facilitar a seleção
+                data.unshift(tag);
+            }
         });
 
         if (obraSelect) {
@@ -661,38 +669,40 @@
         document.getElementById('data_necessidade').valueAsDate = new Date();
         {% endif %}
 
-        // Exibir/ocultar campo de novo item e sugerir unidades ao selecionar item
+        // Sugere unidade ao escolher ou digitar item
         const selectItem = document.getElementById('novoItem');
-        const novoItemNomeGroup = document.getElementById('novoItemNomeGroup');
-        selectItem.addEventListener('change', function() {
-            const codigoItem = this.value;
-            if (codigoItem === 'novo') {
-                novoItemNomeGroup.style.display = 'block';
-            } else {
-                novoItemNomeGroup.style.display = 'none';
+        function sugerirUnidadeDoSelect() {
+            if (!selectItem) {
+                return;
             }
-            // Sugere a unidade para itens existentes
-            if (codigoItem && codigoItem !== 'novo') {
-                const unidadeSugerida = sugerirUnidade(codigoItem);
-                document.getElementById('novaUnidade').value = unidadeSugerida;
+            const nome = (selectItem.value || '').trim();
+            if (!nome) {
+                return;
             }
-        });
+            const unidadeSugerida = sugerirUnidade(nome);
+            document.getElementById('novaUnidade').value = unidadeSugerida;
+        }
+        if (selectItem) {
+            $('#novoItem').on('change', sugerirUnidadeDoSelect);
+            selectItem.addEventListener('blur', sugerirUnidadeDoSelect);
+        }
     });
 
     function sugerirUnidade(codigo) {
-        if (!codigo || codigo === 'novo') {
+        if (!codigo) {
             return 'un';
         }
-        const selectItem = document.getElementById('novoItem');
-        if (selectItem) {
-            const opt = Array.from(selectItem.options).find(o => o.value === codigo);
+        const codigoLower = codigo.toLowerCase();
+        const encontrado = materiaisDisponiveis.find(m => (m.nome || '').toLowerCase() === codigoLower);
+        if (encontrado) {
+            return encontrado.unidade || 'un';
+        }
+        const datalist = document.getElementById('materiaisOptions');
+        if (datalist) {
+            const opt = Array.from(datalist.options).find(o => (o.value || '').toLowerCase() === codigoLower);
             if (opt && opt.dataset && opt.dataset.unidade) {
                 return opt.dataset.unidade;
             }
-        }
-        const encontrado = materiaisDisponiveis.find(m => m.nome === codigo);
-        if (encontrado) {
-            return encontrado.unidade || 'un';
         }
         return 'un';
     }
@@ -771,8 +781,6 @@
 
     function adicionarItem() {
         const selectItem = document.getElementById('novoItem');
-        const novoItemNomeGroup = document.getElementById('novoItemNomeGroup');
-        const novoItemNome = document.getElementById('novoItemNome');
         const observacaoInput = document.getElementById('novaObservacao');
         const quantidadeInput = document.getElementById('novaQuantidade');
         const unidadeSelect = document.getElementById('novaUnidade');
@@ -781,27 +789,13 @@
             return;
         }
 
-        const codigoSelecionado = selectItem.value;
-        if (!codigoSelecionado) {
-            alert('Selecione um item da lista ou informe um novo item.');
+        const nomeDigitado = (selectItem.value || '').trim();
+        const nomeOption = selectItem.selectedOptions && selectItem.selectedOptions[0] ? (selectItem.selectedOptions[0].text || '').trim() : '';
+        const nomeFinal = nomeDigitado || nomeOption;
+        if (!nomeFinal) {
+            alert('Informe o nome do item.');
             selectItem.focus();
             return;
-        }
-
-        const ehNovoItem = codigoSelecionado === 'novo';
-        let nomeFinal = '';
-        if (ehNovoItem) {
-            nomeFinal = novoItemNome ? novoItemNome.value.trim() : '';
-            if (!nomeFinal) {
-                alert('Informe o nome do novo item.');
-                if (novoItemNome) {
-                    novoItemNome.focus();
-                }
-                return;
-            }
-        } else {
-            const option = selectItem.options[selectItem.selectedIndex];
-            nomeFinal = option ? option.text.trim() : '';
         }
 
         const quantidadeValor = quantidadeInput ? quantidadeInput.value.replace(',', '.') : '';
@@ -816,9 +810,10 @@
 
         const unidade = unidadeSelect ? unidadeSelect.value : 'un';
         const observacao = observacaoInput ? observacaoInput.value.trim() : '';
-        const codigoFinal = ehNovoItem ? nomeFinal : codigoSelecionado;
+        const materialExistente = materiaisDisponiveis.find(m => (m.nome || '').toLowerCase() === nomeFinal.toLowerCase());
+        const codigoFinal = materialExistente ? materialExistente.nome : nomeFinal;
 
-        if (ehNovoItem) {
+        if (!materialExistente) {
             inserirMaterialNaLista({ nome: nomeFinal, unidade });
             salvarMaterial(nomeFinal, unidade);
         }
@@ -844,14 +839,10 @@
         if (unidadeSelect) {
             unidadeSelect.value = 'un';
         }
-        if (novoItemNome) {
-            novoItemNome.value = '';
+        selectItem.value = '';
+        if (selectItem && selectItem.select2) {
+            $('#novoItem').val(null).trigger('change');
         }
-        if (novoItemNomeGroup) {
-            novoItemNomeGroup.style.display = 'none';
-        }
-
-        $('#novoItem').val('').trigger('change');
         selectItem.focus();
     }
 

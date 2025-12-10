@@ -956,7 +956,7 @@ def api_materiais():
                 ]
             })
 
-        data = request.get_json() or {}
+        data = request.get_json(silent=True) or request.form or {}
         nome = (data.get('nome') or '').strip()
         unidade = (data.get('unidade') or 'un').strip() or 'un'
 
