@@ -207,7 +207,7 @@
                         <div>
                             <p class="recado-hero-msg">{{ recado_destaque.mensagem }}</p>
                             <div class="recado-hero-meta">
-                                {{ recado_destaque.autor.username if recado_destaque.autor else 'Usuario' }} •
+                                {{ recado_destaque.autor.username if recado_destaque.autor else 'Usuario' }} -
                                 {{ recado_destaque.data_criacao.strftime('%d/%m/%Y %H:%M') }}
                             </div>
                         </div>
@@ -220,7 +220,7 @@
                             <div class="recado-mini">
                                 <p class="recado-mini-msg">{{ recado.mensagem }}</p>
                                 <div class="recado-mini-meta">
-                                    {{ recado.autor.username if recado.autor else 'Usuario' }} •
+                                    {{ recado.autor.username if recado.autor else 'Usuario' }} -
                                     {{ recado.data_criacao.strftime('%d/%m/%Y %H:%M') }}
                                 </div>
                             </div>
