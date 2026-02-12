@@ -209,7 +209,7 @@
                                     </div>
                                     <div class="mb-2">
                                         <span class="text-sm font-weight-bold">Criado:</span>
-                                        <span class="text-sm">{{ pedido.data_criacao.strftime('%d/%m/%Y às %H:%M') }}</span>
+                                        <span class="text-sm">{{ pedido.data_criacao_local_str or '-' }}</span>
                                     </div>
                                     
                                     {% if pedido.observacoes %}

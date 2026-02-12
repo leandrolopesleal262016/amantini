@@ -53,13 +53,13 @@
                                     data-assignee="{{ tarefa.assignee }}"
                                     data-due-date="{{ tarefa.due_date.isoformat() if tarefa.due_date else '' }}"
                                     data-status="{{ tarefa.status }}"
-                                    data-data-criacao="{{ tarefa.data_criacao.isoformat() if tarefa.data_criacao else '' }}"
-                                    data-data-conclusao="{{ tarefa.data_conclusao.isoformat() if tarefa.data_conclusao else '' }}"
+                                    data-data-criacao="{{ tarefa.data_criacao_local_str or '' }}"
+                                    data-data-conclusao="{{ tarefa.data_conclusao_local_str or '' }}"
                                     data-duration="{{ tarefa.duration_display }}"
                                     data-attachment-path="{{ tarefa.attachment_path if tarefa.attachment_path else '' }}">
                                     <th scope="row">{{ tarefa.title }}</th>
                                     <td>{{ tarefa.assignee or '-' }}</td>
-                                    <td>{{ tarefa.data_conclusao.strftime('%d/%m/%Y %H:%M') if tarefa.data_conclusao else '' }}</td>
+                                    <td>{{ tarefa.data_conclusao_local_str or '' }}</td>
                                     <td>{{ tarefa.duration_display }}</td>
                                     <td>
                                         {% if tarefa.attachment_path %}
@@ -129,9 +129,9 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('fin-due-date').textContent = dueDate ? new Date(dueDate).toLocaleDateString('pt-BR') : '';
             document.getElementById('fin-status').textContent = this.getAttribute('data-status') || '';
             const dataCriacao = this.getAttribute('data-data-criacao');
-            document.getElementById('fin-data-criacao').textContent = dataCriacao ? new Date(dataCriacao).toLocaleString('pt-BR') : '';
+            document.getElementById('fin-data-criacao').textContent = dataCriacao || '';
             const dataConclusao = this.getAttribute('data-data-conclusao');
-            document.getElementById('fin-data-conclusao').textContent = dataConclusao ? new Date(dataConclusao).toLocaleString('pt-BR') : '';
+            document.getElementById('fin-data-conclusao').textContent = dataConclusao || '';
             document.getElementById('fin-duration').textContent = this.getAttribute('data-duration') || '';
 
             const attachmentPath = this.getAttribute('data-attachment-path') || '';

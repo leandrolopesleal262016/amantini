@@ -11,8 +11,9 @@ import json
 import os
 import re
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import abort, flash, jsonify, redirect, render_template, request, send_file, send_from_directory, url_for
 from flask_login import current_user, login_required
@@ -20,6 +21,7 @@ from jinja2 import TemplateNotFound
 from sqlalchemy import inspect
 from sqlalchemy.exc import OperationalError, ProgrammingError
 from werkzeug.utils import secure_filename
+from decouple import config
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
@@ -43,6 +45,39 @@ from apps.authentication.models import (
 DATA_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'data'))
 FORNECEDORES_CSV = os.path.join(DATA_FOLDER, 'fornecedores.csv')
 os.makedirs(DATA_FOLDER, exist_ok=True)
+
+
+def _resolve_local_timezone():
+    tz_name = config('APP_TIMEZONE', default='America/Sao_Paulo')
+    try:
+        return ZoneInfo(tz_name)
+    except ZoneInfoNotFoundError:
+        # Fallback for environments without tzdata installed.
+        return timezone(timedelta(hours=-3))
+
+
+LOCAL_TIMEZONE = _resolve_local_timezone()
+
+
+def utc_naive_to_local(dt_value):
+    """Convert UTC-naive datetime stored in DB to local timezone."""
+    if not dt_value:
+        return None
+    if dt_value.tzinfo is None:
+        dt_value = dt_value.replace(tzinfo=timezone.utc)
+    else:
+        dt_value = dt_value.astimezone(timezone.utc)
+    return dt_value.astimezone(LOCAL_TIMEZONE)
+
+
+def attach_local_datetime_fields(record, field_names, fmt='%d/%m/%Y %H:%M'):
+    """Attach `<field>_local` and `<field>_local_str` attributes to a record."""
+    for field_name in field_names:
+        raw_value = getattr(record, field_name, None)
+        local_value = utc_naive_to_local(raw_value)
+        setattr(record, f'{field_name}_local', local_value)
+        setattr(record, f'{field_name}_local_str', local_value.strftime(fmt) if local_value else '')
+    return record
 
 
 def obras_feature_enabled():
@@ -333,6 +368,8 @@ def pedidos_compra():
     pedidos = (PedidoCompra.query
                .order_by(PedidoCompra.data_criacao.desc())
                .all())
+    for pedido in pedidos:
+        attach_local_datetime_fields(pedido, ['data_criacao'])
     return render_template('home/pedidos_compra_lista.html', pedidos=pedidos, segment='pedidos')
 
 @blueprint.route('/pedidos-compra/novo')
@@ -431,10 +468,11 @@ def criar_pedido_compra():
 def ver_pedido_compra(pedido_id):
     """Visualiza um pedido específico"""
     pedido = PedidoCompra.query.filter_by(id=pedido_id).first_or_404()
+    attach_local_datetime_fields(pedido, ['data_criacao'])
     dias_decorridos = None
-    if pedido.data_criacao:
+    if pedido.data_criacao_local:
         try:
-            dias_decorridos = (datetime.utcnow().date() - pedido.data_criacao.date()).days
+            dias_decorridos = (datetime.now(LOCAL_TIMEZONE).date() - pedido.data_criacao_local.date()).days
         except AttributeError:
             dias_decorridos = None
     if dias_decorridos is not None and dias_decorridos < 0:
@@ -446,6 +484,8 @@ def ver_pedido_compra(pedido_id):
 def pedido_compra_pdf(pedido_id):
     """Gera um PDF com os dados completos do pedido de compra."""
     pedido = PedidoCompra.query.filter_by(id=pedido_id).first_or_404()
+    data_criacao_local = utc_naive_to_local(pedido.data_criacao)
+    data_criacao_local_str = data_criacao_local.strftime('%d/%m/%Y %H:%M') if data_criacao_local else '-'
 
     buffer = io.BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=A4)
@@ -486,7 +526,7 @@ def pedido_compra_pdf(pedido_id):
     write_key_value("Prioridade", (pedido.prioridade or '-').title())
     write_key_value("Status", (pedido.status or '-').replace('_', ' ').title())
     write_key_value("Data de necessidade", pedido.data_necessidade.strftime('%d/%m/%Y'))
-    write_key_value("Data de criação", pedido.data_criacao.strftime('%d/%m/%Y %H:%M'))
+    write_key_value("Data de criação", data_criacao_local_str)
     write_line("")
 
     if pedido.observacoes:
@@ -907,9 +947,10 @@ def tarefas_concluidas():
                    .all())
     # Converter duração para dias inteiros em vez de HH:MM:SS
     for t in completadas:
-        if t.data_criacao and t.data_conclusao:
+        attach_local_datetime_fields(t, ['data_criacao', 'data_conclusao'])
+        if t.data_criacao_local and t.data_conclusao_local:
             # Calcula diferença em dias completos entre as datas
-            duration_days = (t.data_conclusao.date() - t.data_criacao.date()).days
+            duration_days = (t.data_conclusao_local.date() - t.data_criacao_local.date()).days
             # Garante pelo menos 0 dias se mesma data
             if duration_days < 0:
                 duration_days = 0
@@ -935,6 +976,11 @@ def compras():
     compras = (Compra.query
                .order_by(Compra.data_criacao.desc())
                .all())
+    for compra in compras:
+        attach_local_datetime_fields(compra, ['data_criacao'])
+        compra.data_criacao_local_date_str = (
+            compra.data_criacao_local.strftime('%d/%m/%Y') if compra.data_criacao_local else ''
+        )
     # Recupera fornecedores do usuário atual para popular o formulário
     fornecedores = (Fornecedor.query
                     .order_by(Fornecedor.nome)
@@ -1201,9 +1247,16 @@ def principal():
                    .order_by(RecadoMural.data_criacao.desc())
                    .limit(30)
                    .all())
-        inicio_dia = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+
+        for recado in recados:
+            local_dt = utc_naive_to_local(recado.data_criacao)
+            recado.data_criacao_local = local_dt
+            recado.data_criacao_local_str = local_dt.strftime('%d/%m/%Y %H:%M') if local_dt else ''
+
+        inicio_dia_local = datetime.now(LOCAL_TIMEZONE).replace(hour=0, minute=0, second=0, microsecond=0)
+        inicio_dia_utc = inicio_dia_local.astimezone(timezone.utc).replace(tzinfo=None)
         recados_hoje = (RecadoMural.query
-                        .filter(RecadoMural.data_criacao >= inicio_dia)
+                        .filter(RecadoMural.data_criacao >= inicio_dia_utc)
                         .count())
     except (OperationalError, ProgrammingError):
         db.session.rollback()
@@ -1417,8 +1470,9 @@ def financeiro():
                   .order_by(CompletedTask.data_conclusao.desc())
                   .all())
     for tarefa in aguardando:
-        if getattr(tarefa, 'data_criacao', None) and tarefa.data_conclusao:
-            duration_days = (tarefa.data_conclusao.date() - tarefa.data_criacao.date()).days
+        attach_local_datetime_fields(tarefa, ['data_criacao', 'data_conclusao'])
+        if tarefa.data_criacao_local and tarefa.data_conclusao_local:
+            duration_days = (tarefa.data_conclusao_local.date() - tarefa.data_criacao_local.date()).days
             if duration_days < 0:
                 duration_days = 0
             tarefa.duration_display = f"{duration_days} dia{'s' if duration_days != 1 else ''}"

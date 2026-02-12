@@ -70,7 +70,7 @@
                                         {% if compra.data_orcamento %}
                                             {{ compra.data_orcamento.strftime('%d/%m/%Y') }}
                                         {% else %}
-                                            {{ compra.data_criacao.strftime('%d/%m/%Y') }}
+                                            {{ compra.data_criacao_local_date_str or '' }}
                                         {% endif %}
                                     </td>
                                     <td>

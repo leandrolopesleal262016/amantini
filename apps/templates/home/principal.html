@@ -205,10 +205,10 @@
                             <i class="ni ni-chat-round"></i>
                         </div>
                         <div>
-                            <p class="recado-hero-msg">{{ recado_destaque.mensagem }}</p>
+                                <p class="recado-hero-msg">{{ recado_destaque.mensagem }}</p>
                             <div class="recado-hero-meta">
                                 {{ recado_destaque.autor.username if recado_destaque.autor else 'Usuario' }} -
-                                {{ recado_destaque.data_criacao.strftime('%d/%m/%Y %H:%M') }}
+                                {{ recado_destaque.data_criacao_local_str or '-' }}
                             </div>
                         </div>
                     </div>
@@ -221,7 +221,7 @@
                                 <p class="recado-mini-msg">{{ recado.mensagem }}</p>
                                 <div class="recado-mini-meta">
                                     {{ recado.autor.username if recado.autor else 'Usuario' }} -
-                                    {{ recado.data_criacao.strftime('%d/%m/%Y %H:%M') }}
+                                    {{ recado.data_criacao_local_str or '-' }}
                                 </div>
                             </div>
                         </div>
@@ -382,7 +382,7 @@
                         <p class="mb-2 text-sm mural-item-msg">{{ recado.mensagem }}</p>
                         <div class="d-flex justify-content-between align-items-center">
                             <small class="text-muted">{{ recado.autor.username if recado.autor else 'Usuario' }}</small>
-                            <small class="text-muted">{{ recado.data_criacao.strftime('%d/%m/%Y %H:%M') }}</small>
+                            <small class="text-muted">{{ recado.data_criacao_local_str or '-' }}</small>
                         </div>
                     </div>
                     {% else %}

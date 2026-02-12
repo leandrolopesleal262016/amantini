@@ -64,12 +64,12 @@
                                     data-assignee="{{ task.assignee }}"
                                     data-due-date="{{ task.due_date.isoformat() if task.due_date else '' }}"
                                     data-status="{{ task.status }}"
-                                    data-data-criacao="{{ task.data_criacao.isoformat() if task.data_criacao else '' }}"
-                                    data-data-conclusao="{{ task.data_conclusao.isoformat() if task.data_conclusao else '' }}"
+                                    data-data-criacao="{{ task.data_criacao_local_str or '' }}"
+                                    data-data-conclusao="{{ task.data_conclusao_local_str or '' }}"
                                     data-duration="{{ task.duration_display }}"
                                     data-attachment-path="{{ task.attachment_path if task.attachment_path else '' }}">
                                     <th scope="row">{{ task.title }}</th>
-                                    <td>{{ task.data_conclusao.strftime('%d/%m/%Y %H:%M') if task.data_conclusao else '' }}</td>
+                                    <td>{{ task.data_conclusao_local_str or '' }}</td>
                                     <td>{{ task.duration_display }}</td>
                                 </tr>
                                 {% endfor %}
@@ -133,19 +133,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             document.getElementById('comp-status').textContent = this.getAttribute('data-status') || '';
             const dataCriacao = this.getAttribute('data-data-criacao');
-            if (dataCriacao) {
-                const dateObj = new Date(dataCriacao);
-                document.getElementById('comp-data-criacao').textContent = dateObj.toLocaleString('pt-BR');
-            } else {
-                document.getElementById('comp-data-criacao').textContent = '';
-            }
+            document.getElementById('comp-data-criacao').textContent = dataCriacao || '';
             const dataConclusao = this.getAttribute('data-data-conclusao');
-            if (dataConclusao) {
-                const dateObj = new Date(dataConclusao);
-                document.getElementById('comp-data-conclusao').textContent = dateObj.toLocaleString('pt-BR');
-            } else {
-                document.getElementById('comp-data-conclusao').textContent = '';
-            }
+            document.getElementById('comp-data-conclusao').textContent = dataConclusao || '';
             document.getElementById('comp-duration').textContent = this.getAttribute('data-duration') || '';
             // Trata o anexo: exibe link se existir
             const attachmentPath = this.getAttribute('data-attachment-path') || '';
