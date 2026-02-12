@@ -12,6 +12,12 @@
       <div class="collapse navbar-collapse" id="sidenav-collapse-main">
         <!-- Nav items -->
         <ul class="navbar-nav">
+          <li class="nav-item">
+            <a class="nav-link {% if 'principal' in segment %} active {% endif %}" href="{{ url_for('home_blueprint.principal') }}">
+              <i class="ni ni-shop text-primary"></i>
+              <span class="nav-link-text">Painel Principal</span>
+            </a>
+          </li>
           <!-- Dashboard -->
           <!-- <li class="nav-item">
             <a class="nav-link {% if 'index' in segment %} active {% endif %}" href="/">

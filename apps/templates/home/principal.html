@@ -1,0 +1,398 @@
+{% extends "layouts/base.html" %}
+
+{% block title %} Painel Principal {% endblock %}
+
+{% block stylesheets %}
+<style>
+    .header.bg-gradient-primary {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+    }
+    .principal-header {
+        padding-top: 0.65rem !important;
+        padding-bottom: 7rem !important;
+    }
+    @media (min-width: 768px) {
+        .principal-header {
+            padding-top: 0.9rem !important;
+            padding-bottom: 8rem !important;
+        }
+    }
+    .header-title {
+        color: #172b4d !important;
+    }
+    .header-subtitle {
+        color: #525f7f !important;
+    }
+    .obra-card {
+        border: 1px solid #edf2f7;
+        border-radius: 0.75rem;
+    }
+    .obra-stats-label {
+        color: #8898aa;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .obra-stats-value {
+        color: #172b4d;
+        font-weight: 700;
+        font-size: 1.25rem;
+        line-height: 1.2;
+    }
+    .status-badge {
+        display: inline-block;
+        padding: 0.2rem 0.55rem;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+    .status-solicitado {
+        background: #ffeaa7;
+        color: #2d3436;
+    }
+    .status-aprovado {
+        background: #74b9ff;
+        color: #ffffff;
+    }
+    .status-em_compra {
+        background: #fd79a8;
+        color: #ffffff;
+    }
+    .status-entregue {
+        background: #00b894;
+        color: #ffffff;
+    }
+    .mural-list {
+        max-height: 380px;
+        overflow-y: auto;
+    }
+    .mural-item-msg {
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    .recados-top-card {
+        border: 0;
+        border-radius: 1rem;
+        overflow: hidden;
+    }
+    .recado-hero {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 1.1rem 1.25rem;
+        border-radius: 0.85rem;
+        background: linear-gradient(135deg, #ffffff 0%, #f5f7ff 100%);
+        border: 1px solid #e9ecf7;
+    }
+    .recado-hero-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        background: linear-gradient(135deg, #5e72e4 0%, #11cdef 100%);
+        flex-shrink: 0;
+        font-size: 1.1rem;
+    }
+    .recado-hero-msg {
+        margin: 0;
+        color: #172b4d;
+        font-size: 1rem;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    .recado-hero-meta {
+        margin-top: 0.5rem;
+        color: #8898aa;
+        font-size: 0.8rem;
+    }
+    .recado-mini {
+        height: 100%;
+        border: 1px solid #edf2f7;
+        border-radius: 0.8rem;
+        padding: 0.8rem 0.9rem;
+        background: #fff;
+    }
+    .recado-mini-msg {
+        margin: 0;
+        color: #32325d;
+        font-size: 0.88rem;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    .recado-mini-meta {
+        margin-top: 0.45rem;
+        color: #8898aa;
+        font-size: 0.75rem;
+    }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+<div class="header bg-gradient-primary principal-header">
+    <div class="container-fluid">
+        <div class="header-body">
+            <div class="row align-items-center mb-4">
+                <div class="col-lg-8 col-12">
+                    <h6 class="h2 d-inline-block mb-0 header-title">Painel Principal</h6>
+                    <p class="mb-0 header-subtitle">
+                        Visao geral por obra com pedidos vinculados e mural de recados da equipe.
+                    </p>
+                </div>
+                <div class="col-lg-4 col-12 text-lg-right mt-3 mt-lg-0">
+                    <a href="{{ url_for('home_blueprint.novo_pedido_compra') }}" class="btn btn-sm btn-primary">
+                        <i class="ni ni-fat-add"></i> Novo Pedido
+                    </a>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-xl-3 col-lg-6">
+                    <div class="card card-stats mb-4 mb-xl-0">
+                        <div class="card-body">
+                            <h5 class="card-title text-uppercase text-muted mb-1">Obras</h5>
+                            <span class="h2 font-weight-bold mb-0">{{ total_obras }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-3 col-lg-6">
+                    <div class="card card-stats mb-4 mb-xl-0">
+                        <div class="card-body">
+                            <h5 class="card-title text-uppercase text-muted mb-1">Pedidos</h5>
+                            <span class="h2 font-weight-bold mb-0">{{ total_pedidos }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-3 col-lg-6">
+                    <div class="card card-stats mb-4 mb-xl-0">
+                        <div class="card-body">
+                            <h5 class="card-title text-uppercase text-muted mb-1">Em Aberto</h5>
+                            <span class="h2 font-weight-bold mb-0">{{ total_em_aberto }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-3 col-lg-6">
+                    <div class="card card-stats mb-4 mb-xl-0">
+                        <div class="card-body">
+                            <h5 class="card-title text-uppercase text-muted mb-1">Recados Hoje</h5>
+                            <span class="h2 font-weight-bold mb-0">{{ recados_hoje }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid mt--7">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow recados-top-card">
+                <div class="card-header border-0 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Recados em Destaque</h5>
+                    <small class="text-muted">Ultimas atualizacoes da equipe</small>
+                </div>
+                <div class="card-body pt-0">
+                    {% if recados %}
+                    {% set recado_destaque = recados[0] %}
+                    <div class="recado-hero mb-3">
+                        <div class="recado-hero-icon">
+                            <i class="ni ni-chat-round"></i>
+                        </div>
+                        <div>
+                            <p class="recado-hero-msg">{{ recado_destaque.mensagem }}</p>
+                            <div class="recado-hero-meta">
+                                {{ recado_destaque.autor.username if recado_destaque.autor else 'Usuario' }} •
+                                {{ recado_destaque.data_criacao.strftime('%d/%m/%Y %H:%M') }}
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if recados|length > 1 %}
+                    <div class="row">
+                        {% for recado in recados[1:4] %}
+                        <div class="col-lg-4 col-md-6 mb-3">
+                            <div class="recado-mini">
+                                <p class="recado-mini-msg">{{ recado.mensagem }}</p>
+                                <div class="recado-mini-meta">
+                                    {{ recado.autor.username if recado.autor else 'Usuario' }} •
+                                    {{ recado.data_criacao.strftime('%d/%m/%Y %H:%M') }}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <div class="alert alert-light mb-0" role="alert">
+                        Ainda nao ha recados publicados.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-xl-8 order-xl-1">
+            {% if not obras_enabled %}
+            <div class="alert alert-warning" role="alert">
+                Cadastro de obras ainda indisponivel. Os cards abaixo usam os pedidos existentes.
+            </div>
+            {% endif %}
+
+            {% if obra_cards %}
+            <div class="row">
+                {% for card in obra_cards %}
+                <div class="col-12 mb-4">
+                    <div class="card shadow-sm obra-card">
+                        <div class="card-header border-0">
+                            <div class="row align-items-center">
+                                <div class="col">
+                                    <h3 class="mb-0">{{ card.nome }}</h3>
+                                    <small class="text-muted">{{ card.endereco or 'Endereco nao informado' }}</small>
+                                </div>
+                                <div class="col-auto">
+                                    <span class="badge badge-primary badge-pill">{{ card.total_pedidos }} pedido(s)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card-body pt-0">
+                            <div class="row mb-3">
+                                <div class="col-md-3 col-6 mb-2">
+                                    <div class="obra-stats-label">Pedidos</div>
+                                    <div class="obra-stats-value">{{ card.total_pedidos }}</div>
+                                </div>
+                                <div class="col-md-3 col-6 mb-2">
+                                    <div class="obra-stats-label">Itens</div>
+                                    <div class="obra-stats-value">{{ card.total_itens }}</div>
+                                </div>
+                                <div class="col-md-3 col-6 mb-2">
+                                    <div class="obra-stats-label">Em Compra</div>
+                                    <div class="obra-stats-value">{{ card.status['em_compra'] }}</div>
+                                </div>
+                                <div class="col-md-3 col-6 mb-2">
+                                    <div class="obra-stats-label">Entregues</div>
+                                    <div class="obra-stats-value">{{ card.status['entregue'] }}</div>
+                                </div>
+                            </div>
+
+                            <h6 class="text-uppercase text-muted ls-1 mb-2">Historico de Pedidos</h6>
+                            {% if card.pedidos_recentes %}
+                            <div class="table-responsive">
+                                <table class="table table-sm align-items-center mb-0">
+                                    <thead class="thead-light">
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Responsavel</th>
+                                            <th>Status</th>
+                                            <th>Necessidade</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for pedido in card.pedidos_recentes %}
+                                        {% set status_value = pedido.status or 'solicitado' %}
+                                        <tr>
+                                            <td>#{{ pedido.id }}</td>
+                                            <td>{{ pedido.responsavel or '-' }}</td>
+                                            <td>
+                                                <span class="status-badge status-{{ status_value }}">
+                                                    {{ status_value|replace('_', ' ')|title }}
+                                                </span>
+                                            </td>
+                                            <td>{{ pedido.data_necessidade.strftime('%d/%m/%Y') if pedido.data_necessidade else '-' }}</td>
+                                            <td class="text-right">
+                                                <a href="{{ url_for('home_blueprint.ver_pedido_compra', pedido_id=pedido.id) }}" class="btn btn-sm btn-outline-primary">
+                                                    Ver
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-sm text-muted mb-0">
+                                Nenhum pedido vinculado a esta obra ate o momento.
+                            </p>
+                            {% endif %}
+                        </div>
+
+                        <div class="card-footer bg-transparent border-0 pt-0">
+                            <small class="text-muted">
+                                Historico de compras por obra: o modulo de compras ainda nao possui vinculo direto com obra.
+                                Total geral de compras: {{ compras_total }}.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="card shadow">
+                <div class="card-body text-center py-5">
+                    <h3 class="text-muted mb-2">Nenhuma obra encontrada</h3>
+                    <p class="text-muted mb-4">Cadastre obras e pedidos para visualizar os cards desta tela.</p>
+                    <a href="{{ url_for('home_blueprint.novo_pedido_compra') }}" class="btn btn-primary btn-sm">
+                        Criar Pedido
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-xl-4 order-xl-2">
+            <div class="card shadow mb-4">
+                <div class="card-header border-0">
+                    <h5 class="mb-0">Mural de Recados</h5>
+                </div>
+                <div class="card-body pt-0">
+                    <form method="post" action="{{ url_for('home_blueprint.criar_recado_principal') }}">
+                        <div class="form-group mb-3">
+                            <label class="form-control-label" for="mural-mensagem">Mensagem para o time</label>
+                            <textarea
+                                class="form-control"
+                                id="mural-mensagem"
+                                name="mensagem"
+                                rows="3"
+                                maxlength="1000"
+                                placeholder="Escreva aqui o recado do dia"
+                                required
+                            ></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-primary">
+                            Publicar Recado
+                        </button>
+                        <small class="d-block text-muted mt-2">
+                            Neste momento todos os usuarios podem publicar.
+                        </small>
+                    </form>
+                </div>
+
+                <div class="list-group list-group-flush mural-list">
+                    {% for recado in recados %}
+                    <div class="list-group-item">
+                        <p class="mb-2 text-sm mural-item-msg">{{ recado.mensagem }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">{{ recado.autor.username if recado.autor else 'Usuario' }}</small>
+                            <small class="text-muted">{{ recado.data_criacao.strftime('%d/%m/%Y %H:%M') }}</small>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="list-group-item">
+                        <span class="text-sm text-muted">Ainda nao ha recados publicados.</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

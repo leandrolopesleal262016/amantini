@@ -156,7 +156,6 @@
       const tab = document.getElementById('sidenav-tab');
       const BREAKPOINT = 992;
       let touchStartX = null;
-      let userPinned = false;
 
       function isMobile() {
         return window.innerWidth < BREAKPOINT;
@@ -168,15 +167,13 @@
         tab.setAttribute('aria-hidden', visible ? 'false' : 'true');
       }
 
-      function closeSidenav(manual = false) {
-        if (manual) { userPinned = true; }
+      function closeSidenav() {
         body.classList.add('sidenav-collapsed');
         body.classList.remove('sidenav-open');
         updateTab();
       }
 
-      function openSidenav(manual = false) {
-        if (manual) { userPinned = true; }
+      function openSidenav() {
         body.classList.remove('sidenav-collapsed');
         if (isMobile()) {
           body.classList.add('sidenav-open');
@@ -188,24 +185,27 @@
 
       function toggleSidenav() {
         if (body.classList.contains('sidenav-collapsed')) {
-          openSidenav(true);
+          openSidenav();
         } else {
-          closeSidenav(true);
+          closeSidenav();
         }
       }
 
       function syncState() {
         if (isMobile()) {
-          if (!body.classList.contains('sidenav-open') && !body.classList.contains('sidenav-collapsed')) {
+          if (!body.classList.contains('sidenav-open')) {
             body.classList.add('sidenav-collapsed');
           }
         } else {
           body.classList.remove('sidenav-open');
-          if (!userPinned) {
-            body.classList.remove('sidenav-collapsed');
-          }
+          body.classList.add('sidenav-collapsed');
         }
         updateTab();
+      }
+
+      // Keep Argon default as unpinned across page navigations.
+      if (window.Cookies) {
+        window.Cookies.set('sidenav-state', 'unpinned');
       }
 
       syncState();
@@ -215,7 +215,11 @@
         toggler.addEventListener('click', function (event) {
           event.preventDefault();
           event.stopPropagation();
-          toggleSidenav();
+          if (isMobile()) {
+            toggleSidenav();
+          } else {
+            closeSidenav();
+          }
         });
       }
 
@@ -223,7 +227,7 @@
         tab.addEventListener('click', function (event) {
           event.preventDefault();
           event.stopPropagation();
-          openSidenav(true);
+          openSidenav();
         });
       }
 
@@ -241,7 +245,7 @@
           }
         } else {
           if (!body.classList.contains('sidenav-collapsed') && !clickedInside) {
-            closeSidenav(true);
+            closeSidenav();
           }
         }
       });
@@ -259,7 +263,7 @@
           if (deltaX < 0 && body.classList.contains('sidenav-open')) {
             closeSidenav();
           } else if (deltaX > 0 && body.classList.contains('sidenav-collapsed') && touchStartX < 40) {
-            openSidenav(true);
+            openSidenav();
           }
         }
         touchStartX = null;

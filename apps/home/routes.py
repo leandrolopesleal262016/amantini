@@ -10,6 +10,7 @@ import io
 import json
 import os
 import re
+from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
@@ -35,6 +36,7 @@ from apps.authentication.models import (
     Fornecedor,
     Compra,
     Material,
+    RecadoMural,
     Users,
 )
 
@@ -67,6 +69,65 @@ def safe_obras_list(usuario_id=None):
     except (OperationalError, ProgrammingError):
         db.session.rollback()
         return [], False
+
+
+def _build_obra_card(nome, endereco, pedidos):
+    status_map = {
+        'solicitado': 0,
+        'aprovado': 0,
+        'em_compra': 0,
+        'entregue': 0
+    }
+    total_itens = 0
+
+    for pedido in pedidos:
+        total_itens += len(pedido.itens or [])
+        status_key = (pedido.status or '').strip().lower()
+        if status_key in status_map:
+            status_map[status_key] += 1
+
+    return {
+        'nome': nome or 'Obra sem nome',
+        'endereco': endereco,
+        'total_pedidos': len(pedidos),
+        'total_itens': total_itens,
+        'status': status_map,
+        'pedidos_recentes': pedidos[:4],
+    }
+
+
+def build_obras_overview_cards():
+    """Build data cards for the principal page grouped by obra."""
+    obras, obras_enabled = safe_obras_list()
+    pedidos = (PedidoCompra.query
+               .order_by(PedidoCompra.data_criacao.desc())
+               .all())
+
+    pedidos_por_obra_id = defaultdict(list)
+    pedidos_por_nome = defaultdict(list)
+    for pedido in pedidos:
+        if pedido.obra_id:
+            pedidos_por_obra_id[pedido.obra_id].append(pedido)
+        nome_key = (pedido.obra or '').strip().lower()
+        if nome_key:
+            pedidos_por_nome[nome_key].append(pedido)
+
+    cards = []
+    if obras_enabled and obras:
+        for obra in obras:
+            nome_key = (obra.nome or '').strip().lower()
+            pedidos_obra = list(pedidos_por_obra_id.get(obra.id, []))
+            if not pedidos_obra and nome_key:
+                pedidos_obra = list(pedidos_por_nome.get(nome_key, []))
+            cards.append(_build_obra_card(obra.nome, obra.endereco, pedidos_obra))
+    else:
+        for nome_key, pedidos_obra in pedidos_por_nome.items():
+            if not pedidos_obra:
+                continue
+            cards.append(_build_obra_card(pedidos_obra[0].obra, None, pedidos_obra))
+
+    cards.sort(key=lambda item: (item['nome'] or '').lower())
+    return cards, obras_enabled
 
 
 def _normalize_cell(value):
@@ -1114,7 +1175,74 @@ def atualizar_status_pedido(pedido_id):
 @blueprint.route('/index')
 @login_required
 def index():
-    return render_template('home/index.html', segment='index')
+    return redirect(url_for('home_blueprint.principal'))
+
+
+@blueprint.route('/principal')
+@login_required
+def principal():
+    obra_cards, obras_enabled = build_obras_overview_cards()
+
+    total_pedidos = sum(card['total_pedidos'] for card in obra_cards)
+    total_entregues = sum(card['status']['entregue'] for card in obra_cards)
+    total_em_aberto = max(total_pedidos - total_entregues, 0)
+
+    compras_total = 0
+    try:
+        compras_total = Compra.query.count()
+    except (OperationalError, ProgrammingError):
+        db.session.rollback()
+        compras_total = 0
+
+    recados = []
+    recados_hoje = 0
+    try:
+        recados = (RecadoMural.query
+                   .order_by(RecadoMural.data_criacao.desc())
+                   .limit(30)
+                   .all())
+        inicio_dia = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        recados_hoje = (RecadoMural.query
+                        .filter(RecadoMural.data_criacao >= inicio_dia)
+                        .count())
+    except (OperationalError, ProgrammingError):
+        db.session.rollback()
+        recados = []
+        recados_hoje = 0
+
+    return render_template(
+        'home/principal.html',
+        segment='principal',
+        obra_cards=obra_cards,
+        obras_enabled=obras_enabled,
+        total_obras=len(obra_cards),
+        total_pedidos=total_pedidos,
+        total_entregues=total_entregues,
+        total_em_aberto=total_em_aberto,
+        compras_total=compras_total,
+        recados=recados,
+        recados_hoje=recados_hoje
+    )
+
+
+@blueprint.route('/principal/recados', methods=['POST'])
+@login_required
+def criar_recado_principal():
+    mensagem = (request.form.get('mensagem') or '').strip()
+    if not mensagem:
+        return redirect(url_for('home_blueprint.principal'))
+
+    recado = RecadoMural(
+        mensagem=mensagem[:1000],
+        usuario_id=current_user.id
+    )
+    try:
+        db.session.add(recado)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    return redirect(url_for('home_blueprint.principal'))
 
 
 @blueprint.route('/contacts', methods=['GET', 'POST'])

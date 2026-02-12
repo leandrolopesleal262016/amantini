@@ -249,6 +249,24 @@ class Compra(db.Model):
         return f'<Compra {self.id} - {self.valor}>'
 
 
+class RecadoMural(db.Model):
+    __tablename__ = 'mural_recados'
+
+    id = db.Column(db.Integer, primary_key=True)
+    mensagem = db.Column(db.Text, nullable=False)
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('Users.id'), nullable=False)
+
+    autor = db.relationship(
+        'Users',
+        backref=db.backref('recados_mural', lazy=True),
+        lazy='joined'
+    )
+
+    def __repr__(self):
+        return f'<RecadoMural {self.id} by {self.usuario_id}>'
+
+
 class Material(db.Model):
     __tablename__ = 'materiais'
 
