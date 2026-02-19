@@ -70,6 +70,8 @@
         padding: 16px;
         min-height: 500px;
         border: 1px solid #e3e8ee;
+        display: flex;
+        flex-direction: column;
     }
 
     .column-header {
@@ -224,6 +226,7 @@
        header or other cards. */
     .task-list {
         min-height: 150px;
+        flex: 1;
     }
 
     .task-counter {
@@ -794,6 +797,9 @@
                 group: 'tasks',
                 animation: 150,
                 draggable: '.task-card',
+                invertSwap: true,
+                swapThreshold: 0.35,
+                emptyInsertThreshold: 40,
                 ghostClass: 'sortable-ghost',
                 chosenClass: 'sortable-chosen',
                 dragClass: 'sortable-drag',
