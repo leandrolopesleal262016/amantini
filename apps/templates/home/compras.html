@@ -1,6 +1,6 @@
-﻿{% extends "layouts/base.html" %}
+{% extends "layouts/base.html" %}
 
-{% block title %} ServiÃ§os {% endblock %}
+{% block title %} Servicos {% endblock %}
 
 {% block stylesheets %}
 <style>
@@ -18,6 +18,9 @@
     body {
         background-color: #f8f9fa !important;
     }
+    .servico-row {
+        cursor: pointer;
+    }
 </style>
 {% endblock stylesheets %}
 
@@ -27,11 +30,11 @@
         <div class="header-body">
             <div class="row align-items-center">
                 <div class="col-lg-6 col-7">
-                    <h6 class="h2 d-inline-block mb-0 header-title">ServiÃ§os</h6>
+                    <h6 class="h2 d-inline-block mb-0 header-title">Servicos</h6>
                 </div>
                 <div class="col-lg-6 col-5 text-right">
                     <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#newCompraModal">
-                        <i class="ni ni-fat-add"></i> Novo OrÃ§amento
+                        <i class="ni ni-fat-add"></i> Novo Orcamento
                     </button>
                 </div>
             </div>
@@ -51,14 +54,20 @@
                                     <th scope="col">Fornecedor</th>
                                     <th scope="col">Obra</th>
                                     <th scope="col">Valor</th>
-                                    <th scope="col">Data do OrÃ§amento</th>
+                                    <th scope="col">Data do Orcamento</th>
                                     <th scope="col">Arquivos</th>
-                                    <th scope="col">AÃ§Ã£o</th>
+                                    <th scope="col">Acao</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for compra in compras %}
-                                <tr>
+                                <tr class="servico-row"
+                                    data-id="{{ compra.id }}"
+                                    data-obra-id="{{ compra.obra.id if compra.obra else '' }}"
+                                    data-fornecedor-id="{{ compra.fornecedor_id }}"
+                                    data-valor="{{ '%.2f' | format(compra.valor) }}"
+                                    data-data-orcamento="{{ compra.data_orcamento.isoformat() if compra.data_orcamento else '' }}"
+                                    data-aprovado="{{ '1' if compra.aprovado else '0' }}">
                                     <th scope="row">{{ compra.fornecedor.nome_fantasia or compra.fornecedor.nome }}</th>
                                     <td>{{ compra.obra.nome if compra.obra else '-' }}</td>
                                     <td>R$ {{ '%.2f' | format(compra.valor) }}</td>
@@ -71,7 +80,7 @@
                                     </td>
                                     <td>
                                         {% if compra.servico_attachments %}
-                                            <a href="{{ compra.servico_attachments_zip_url }}" class="btn btn-sm btn-primary" target="_blank">Arquivos</a>
+                                            <a href="{{ compra.servico_attachments_zip_url }}" class="btn btn-sm btn-primary" target="_blank" onclick="event.stopPropagation();">Arquivos</a>
                                         {% else %}
                                             <span class="text-muted">Nenhum</span>
                                         {% endif %}
@@ -82,21 +91,23 @@
                                         {% elif compra.aprovado %}
                                             <span class="badge badge-success">Encaminhado</span>
                                             {% if compra.pedido_id %}
-                                                <a href="{{ url_for('home_blueprint.ver_pedido_compra', pedido_id=compra.pedido_id) }}" class="btn btn-sm btn-link">Ver pedido</a>
+                                                <a href="{{ url_for('home_blueprint.ver_pedido_compra', pedido_id=compra.pedido_id) }}" class="btn btn-sm btn-link" onclick="event.stopPropagation();">Ver pedido</a>
                                             {% endif %}
+                                            <button type="button" class="btn btn-sm btn-outline-secondary ml-2" onclick="event.stopPropagation(); openEditCompraModalFromRow(this.closest('tr'));">Editar</button>
                                         {% else %}
                                             <button type="button"
                                                     class="btn btn-sm btn-success"
-                                                    onclick="openApproveModal({{ compra.id }})">
-                                                Aprovar orÃ§amento
+                                                    onclick="event.stopPropagation(); openApproveModal({{ compra.id }})">
+                                                Aprovar orcamento
                                             </button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary ml-2" onclick="event.stopPropagation(); openEditCompraModalFromRow(this.closest('tr'));">Editar</button>
                                         {% endif %}
                                     </td>
                                 </tr>
                                 {% else %}
                                 <tr>
                                     <td colspan="6" class="text-center text-muted py-4">
-                                        Nenhum serviÃ§o cadastrado atÃ© o momento.
+                                        Nenhum servico cadastrado ate o momento.
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -112,7 +123,7 @@
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="newCompraModalLabel">Novo OrÃ§amento</h5>
+                    <h5 class="modal-title" id="newCompraModalLabel">Novo Orcamento</h5>
                     <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
@@ -128,7 +139,7 @@
                                         <option value="{{ obra.id }}">{{ obra.nome }}</option>
                                     {% endfor %}
                                 {% else %}
-                                    <option value="">Nenhuma obra disponÃ­vel</option>
+                                    <option value="">Nenhuma obra disponivel</option>
                                 {% endif %}
                             </select>
                         </div>
@@ -151,7 +162,7 @@
                                     <input type="text" class="form-control" id="nf_nome_fantasia" required>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">RazÃ£o Social</label>
+                                    <label class="form-label">Razao Social</label>
                                     <input type="text" class="form-control" id="nf_razao_social">
                                 </div>
                                 <div class="col-md-4">
@@ -187,7 +198,7 @@
                                     <input type="text" class="form-control" id="nf_logradouro">
                                 </div>
                                 <div class="col-md-2">
-                                    <label class="form-label">NÃºmero</label>
+                                    <label class="form-label">Numero</label>
                                     <input type="text" class="form-control" id="nf_numero">
                                 </div>
                                 <div class="col-md-4">
@@ -203,18 +214,18 @@
                                     <input type="text" class="form-control" id="nf_estado" maxlength="2">
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label">ObservaÃ§Ãµes</label>
+                                    <label class="form-label">Observacoes</label>
                                     <textarea class="form-control" id="nf_obs" rows="2"></textarea>
                                 </div>
                             </div>
                         </div>
 
                         <div class="form-group">
-                            <label for="compra-valor">Valor do OrÃ§amento</label>
+                            <label for="compra-valor">Valor do Orcamento</label>
                             <input type="number" step="0.01" min="0.01" class="form-control" id="compra-valor" placeholder="0,00" required>
                         </div>
                         <div class="form-group">
-                            <label for="compra-data">Data do OrÃ§amento</label>
+                            <label for="compra-data">Data do Orcamento</label>
                             <input type="date" class="form-control" id="compra-data">
                         </div>
                         <div class="form-group">
@@ -242,18 +253,75 @@
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="approveCompraModalLabel">Confirmar AprovaÃ§Ã£o</h5>
+                    <h5 class="modal-title" id="approveCompraModalLabel">Confirmar Aprovacao</h5>
                     <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <div class="modal-body">
                     <input type="hidden" id="approve-compra-id">
-                    <p class="mb-0">Ao confirmar, este orÃ§amento serÃ¡ encaminhado ao Pedido de Compras e aparecerÃ¡ na coluna <strong>Pendente</strong>.</p>
+                    <p class="mb-0">Ao confirmar, este orcamento sera encaminhado ao Pedido de Compras e aparecera na coluna <strong>Pendente</strong>.</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="button" class="btn btn-success" onclick="confirmApproveCompra()">Confirmar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="editCompraModal" tabindex="-1" role="dialog" aria-labelledby="editCompraModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editCompraModalLabel">Editar Orcamento</h5>
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="edit-compra-id">
+                    <div id="edit-compra-aprovado-alert" class="alert alert-warning py-2" style="display:none;">
+                        Este orcamento ja foi encaminhado para Pedido de Compras.
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-compra-obra">Obra</label>
+                        <select class="form-control" id="edit-compra-obra" required>
+                            <option value="">Selecione uma obra</option>
+                            {% for obra in obras %}
+                                <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-compra-fornecedor">Fornecedor</label>
+                        <select class="form-control" id="edit-compra-fornecedor" required>
+                            <option value="">Selecione um fornecedor</option>
+                            {% for fornecedor in fornecedores %}
+                                <option value="{{ fornecedor.id }}">{{ fornecedor.nome_fantasia or fornecedor.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-compra-valor">Valor do Orcamento</label>
+                        <input type="number" step="0.01" min="0.01" class="form-control" id="edit-compra-valor" required>
+                    </div>
+                    <div class="form-group mb-0">
+                        <label for="edit-compra-data">Data do Orcamento</label>
+                        <input type="date" class="form-control" id="edit-compra-data">
+                    </div>
+                    <hr>
+                    <div class="form-group mb-0">
+                        <label for="edit-compra-attachments-input"><strong>Anexos do Orcamento</strong></label>
+                        <input type="file" class="form-control" id="edit-compra-attachments-input" multiple>
+                        <small class="form-text text-muted">Voce pode anexar mais de um arquivo.</small>
+                        <button type="button" class="btn btn-sm btn-info mt-2" id="btn-upload-edit-compra-attachments" onclick="uploadCompraAttachments()">Adicionar arquivos</button>
+                        <ul id="edit-compra-attachments-list" class="mt-2 mb-0 pl-3"></ul>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-success" id="btn-save-edit-compra" onclick="saveCompraEdit()">Salvar alteracoes</button>
                 </div>
             </div>
         </div>
@@ -327,6 +395,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const anexosInput = document.getElementById('compra-anexos');
     const addAnexoButton = document.getElementById('btn-add-compra-anexo');
     const newCompraModal = document.getElementById('newCompraModal');
+    const servicoRows = document.querySelectorAll('.servico-row');
     const obrasEnabled = {{ 'true' if obras_enabled else 'false' }};
 
     if (!obrasEnabled && saveButton) {
@@ -360,8 +429,180 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    servicoRows.forEach(function(row) {
+        row.addEventListener('click', function(event) {
+            if (event.target.closest('a, button')) return;
+            openEditCompraModalFromRow(row);
+        });
+    });
+
     renderCompraAttachmentsList();
 });
+
+function openEditCompraModalFromRow(row) {
+    if (!row) return;
+
+    const compraId = row.getAttribute('data-id') || '';
+    const obraId = row.getAttribute('data-obra-id') || '';
+    const fornecedorId = row.getAttribute('data-fornecedor-id') || '';
+    const valor = row.getAttribute('data-valor') || '';
+    const dataOrcamento = row.getAttribute('data-data-orcamento') || '';
+    const aprovado = row.getAttribute('data-aprovado') === '1';
+
+    document.getElementById('edit-compra-id').value = compraId;
+    document.getElementById('edit-compra-obra').value = obraId;
+    document.getElementById('edit-compra-fornecedor').value = fornecedorId;
+    document.getElementById('edit-compra-valor').value = valor;
+    document.getElementById('edit-compra-data').value = dataOrcamento;
+    const attachmentsInput = document.getElementById('edit-compra-attachments-input');
+    if (attachmentsInput) attachmentsInput.value = '';
+
+    const approvedAlert = document.getElementById('edit-compra-aprovado-alert');
+    if (approvedAlert) {
+        approvedAlert.style.display = aprovado ? 'block' : 'none';
+    }
+
+    loadEditCompraAttachments(compraId);
+    $('#editCompraModal').modal('show');
+}
+
+function formatFileSize(bytes) {
+    const value = Number(bytes || 0);
+    if (!value) return '';
+    if (value < 1024) return `${value} B`;
+    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function renderEditCompraAttachments(attachments) {
+    const list = document.getElementById('edit-compra-attachments-list');
+    if (!list) return;
+
+    list.innerHTML = '';
+    if (!attachments || attachments.length === 0) {
+        const item = document.createElement('li');
+        item.className = 'text-muted';
+        item.textContent = 'Nenhum anexo.';
+        list.appendChild(item);
+        return;
+    }
+
+    attachments.forEach(att => {
+        const item = document.createElement('li');
+        item.className = 'mb-1';
+
+        const link = document.createElement('a');
+        link.href = att.url;
+        link.target = '_blank';
+        link.textContent = att.name || 'Arquivo';
+        item.appendChild(link);
+
+        const size = formatFileSize(att.file_size);
+        if (size) {
+            const sizeSpan = document.createElement('small');
+            sizeSpan.className = 'text-muted ml-2';
+            sizeSpan.textContent = `(${size})`;
+            item.appendChild(sizeSpan);
+        }
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn btn-sm btn-link text-danger ml-2 p-0';
+        removeBtn.textContent = 'Remover';
+        removeBtn.addEventListener('click', function() {
+            removeCompraAttachment(att.id, att.stored_filename);
+        });
+        item.appendChild(removeBtn);
+
+        list.appendChild(item);
+    });
+}
+
+async function loadEditCompraAttachments(compraId) {
+    if (!compraId) return;
+    try {
+        const resp = await fetch(`/api/compras/${compraId}/attachments`);
+        const out = await resp.json();
+        if (!resp.ok || !out.success) {
+            renderEditCompraAttachments([]);
+            return;
+        }
+        renderEditCompraAttachments(out.attachments || []);
+    } catch (e) {
+        renderEditCompraAttachments([]);
+    }
+}
+
+async function uploadCompraAttachments() {
+    const compraId = document.getElementById('edit-compra-id').value;
+    const input = document.getElementById('edit-compra-attachments-input');
+    const btn = document.getElementById('btn-upload-edit-compra-attachments');
+    const files = input && input.files ? Array.from(input.files) : [];
+
+    if (!compraId) {
+        alert('Orcamento invalido.');
+        return;
+    }
+    if (files.length === 0) {
+        alert('Selecione ao menos um arquivo.');
+        return;
+    }
+
+    const formData = new FormData();
+    files.forEach(file => formData.append('attachments', file));
+
+    if (btn) btn.disabled = true;
+    try {
+        const resp = await fetch(`/api/compras/${compraId}/attachments`, {
+            method: 'POST',
+            body: formData
+        });
+        const out = await resp.json();
+        if (!resp.ok || !out.success) {
+            alert(out.message || 'Nao foi possivel anexar arquivos.');
+            return;
+        }
+        renderEditCompraAttachments(out.attachments || []);
+        if (input) input.value = '';
+        if (out.rejected && out.rejected.length > 0) {
+            alert(`Alguns arquivos foram recusados: ${out.rejected.join(', ')}`);
+        }
+    } catch (e) {
+        alert('Erro ao anexar arquivos.');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+async function removeCompraAttachment(attachmentId, storedFilename) {
+    const compraId = document.getElementById('edit-compra-id').value;
+    if (!compraId) return;
+
+    if (!confirm('Remover este anexo do orcamento?')) {
+        return;
+    }
+
+    const payload = {
+        attachment_id: attachmentId || null,
+        stored_filename: storedFilename || ''
+    };
+
+    try {
+        const resp = await fetch(`/api/compras/${compraId}/attachments`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const out = await resp.json();
+        if (!resp.ok || !out.success) {
+            alert(out.message || 'Nao foi possivel remover o anexo.');
+            return;
+        }
+        renderEditCompraAttachments(out.attachments || []);
+    } catch (e) {
+        alert('Erro ao remover anexo.');
+    }
+}
 
 async function createCompra() {
     const obraId = document.getElementById('compra-obra').value;
@@ -379,7 +620,7 @@ async function createCompra() {
         return;
     }
     if (!valor) {
-        alert('Informe o valor do orÃ§amento.');
+        alert('Informe o valor do orcamento.');
         return;
     }
 
@@ -451,12 +692,12 @@ async function createCompra() {
         });
         const out2 = await respCompra.json();
         if (!respCompra.ok || !out2.success) {
-            alert(out2.message || 'Erro ao criar orÃ§amento.');
+            alert(out2.message || 'Erro ao criar orcamento.');
             return;
         }
         location.reload();
     } catch (e) {
-        alert('Erro ao criar serviÃ§o.');
+        alert('Erro ao criar servico.');
     }
 }
 
@@ -489,6 +730,68 @@ async function confirmApproveCompra() {
         window.location.href = '/pedidos-compra';
     } catch (e) {
         alert('Erro ao aprovar orcamento.');
+    }
+}
+
+async function saveCompraEdit() {
+    const compraId = document.getElementById('edit-compra-id').value;
+    const obraId = document.getElementById('edit-compra-obra').value;
+    const fornecedorId = document.getElementById('edit-compra-fornecedor').value;
+    const valor = document.getElementById('edit-compra-valor').value;
+    const data = document.getElementById('edit-compra-data').value;
+    const saveBtn = document.getElementById('btn-save-edit-compra');
+
+    if (!compraId) {
+        alert('Orcamento invalido.');
+        return;
+    }
+    if (!obraId) {
+        alert('Selecione uma obra.');
+        return;
+    }
+    if (!fornecedorId) {
+        alert('Selecione um fornecedor.');
+        return;
+    }
+    if (!valor || Number(valor) <= 0) {
+        alert('Informe um valor valido.');
+        return;
+    }
+
+    const payload = {
+        obra_id: Number(obraId),
+        fornecedor_id: Number(fornecedorId),
+        valor: Number(valor),
+        data: data || ''
+    };
+
+    if (saveBtn) saveBtn.disabled = true;
+    try {
+        const resp = await fetch(`/api/compras/${compraId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        let out = {};
+        try {
+            out = await resp.json();
+        } catch (jsonErr) {
+            out = {};
+        }
+
+        if (!resp.ok || !out.success) {
+            const fallback = `Nao foi possivel salvar as alteracoes (HTTP ${resp.status}).`;
+            alert(out.message || fallback);
+            return;
+        }
+
+        $('#editCompraModal').modal('hide');
+        location.reload();
+    } catch (e) {
+        alert('Erro ao salvar alteracoes do orcamento.');
+    } finally {
+        if (saveBtn) saveBtn.disabled = false;
     }
 }
 </script>

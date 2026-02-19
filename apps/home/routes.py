@@ -1624,6 +1624,221 @@ def api_criar_compra():
     return jsonify({'success': True, 'compra_id': compra.id})
 
 
+@blueprint.route('/api/compras/<int:compra_id>', methods=['PATCH'])
+@login_required
+def api_atualizar_compra(compra_id):
+    """Atualiza os campos principais de um serviço/orçamento."""
+    compra = Compra.query.filter_by(id=compra_id, usuario_id=current_user.id).first_or_404()
+    data = request.get_json(silent=True) or request.form or {}
+
+    obra_id_raw = data.get('obra_id') or data.get('obraId')
+    fornecedor_id_raw = data.get('fornecedor_id') or data.get('fornecedorId')
+    valor_raw = data.get('valor') or data.get('value')
+    data_orcamento_raw = data.get('data') or data.get('data_orcamento') or data.get('dataOrcamento')
+
+    if not obra_id_raw:
+        return jsonify({'success': False, 'message': 'Obra e obrigatoria.'}), 400
+    if not fornecedor_id_raw:
+        return jsonify({'success': False, 'message': 'Fornecedor e obrigatorio.'}), 400
+    if valor_raw is None or str(valor_raw).strip() == '':
+        return jsonify({'success': False, 'message': 'Valor e obrigatorio.'}), 400
+
+    try:
+        obra_id = int(obra_id_raw)
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'Obra invalida.'}), 400
+
+    obra = Obra.query.filter_by(id=obra_id, usuario_id=current_user.id).first()
+    if not obra:
+        return jsonify({'success': False, 'message': 'Obra nao encontrada.'}), 404
+
+    try:
+        fornecedor_id = int(fornecedor_id_raw)
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'Fornecedor invalido.'}), 400
+
+    fornecedor = Fornecedor.query.filter_by(id=fornecedor_id, usuario_id=current_user.id).first()
+    if not fornecedor:
+        return jsonify({'success': False, 'message': 'Fornecedor nao encontrado.'}), 404
+
+    try:
+        valor_float = float(valor_raw)
+        if valor_float <= 0:
+            raise ValueError
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'Valor invalido.'}), 400
+
+    data_orcamento = None
+    if data_orcamento_raw:
+        try:
+            data_orcamento = datetime.strptime(str(data_orcamento_raw), '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'success': False, 'message': 'Data do orcamento invalida.'}), 400
+
+    workflow = compra.workflow
+    if workflow is None:
+        workflow = CompraWorkflow(compra_id=compra.id, obra_id=obra.id, pedido_id=None)
+        db.session.add(workflow)
+    else:
+        workflow.obra_id = obra.id
+
+    compra.fornecedor_id = fornecedor.id
+    compra.valor = valor_float
+    compra.data_orcamento = data_orcamento
+
+    if workflow.pedido_id:
+        pedido = PedidoCompra.query.filter_by(id=workflow.pedido_id, usuario_id=current_user.id).first()
+        if pedido:
+            pedido.obra = obra.nome or pedido.obra
+            pedido.obra_id = obra.id
+            pedido.obra_endereco = obra.endereco
+            pedido.data_necessidade = data_orcamento or pedido.data_necessidade
+            pedido.observacoes = (
+                f"Encaminhado automaticamente do servico/orcamento #{compra.id}. "
+                f"Fornecedor: {fornecedor.nome if fornecedor else '-'} | "
+                f"Valor: R$ {compra.valor:.2f}"
+            )
+
+            item = (ItemPedido.query
+                    .filter_by(pedido_id=pedido.id)
+                    .order_by(ItemPedido.id.asc())
+                    .first())
+            if item:
+                item.nome_item = f"Servico - {fornecedor.nome if fornecedor else 'Fornecedor'}"[:200]
+                item.observacao = f"Originado do servico/orcamento #{compra.id}"
+
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'compra_id': compra.id,
+        'pedido_id': workflow.pedido_id,
+        'valor': compra.valor,
+        'fornecedor': fornecedor.nome_fantasia or fornecedor.nome,
+        'obra': obra.nome,
+        'data_orcamento': (compra.data_orcamento.isoformat() if compra.data_orcamento else None)
+    })
+
+
+@blueprint.route('/api/compras/<int:compra_id>/attachments', methods=['GET', 'POST', 'DELETE'])
+@login_required
+def compra_attachments(compra_id):
+    """Lista, adiciona e remove anexos de um serviço/orçamento."""
+    compra = Compra.query.filter_by(id=compra_id, usuario_id=current_user.id).first_or_404()
+
+    if request.method == 'GET':
+        attachments = _collect_compra_attachments(compra)
+        return jsonify({
+            'success': True,
+            'attachments': attachments,
+            'total_attachments': len(attachments)
+        })
+
+    if request.method == 'POST':
+        uploaded_files = []
+        if request.files:
+            uploaded_files.extend(request.files.getlist('attachments'))
+            uploaded_files.extend(request.files.getlist('anexos'))
+            for key in ('attachment', 'anexo'):
+                single_file = request.files.get(key)
+                if single_file:
+                    uploaded_files.append(single_file)
+
+        if not uploaded_files:
+            return jsonify({'success': False, 'message': 'Nenhum arquivo enviado.'}), 400
+
+        created = []
+        rejected = []
+        for uploaded in uploaded_files:
+            if not uploaded or not uploaded.filename:
+                continue
+
+            stored = _store_orcamento_file(uploaded, f"servico{compra.id}")
+            if not stored:
+                rejected.append(uploaded.filename)
+                continue
+
+            record = CompraAttachment(
+                compra_id=compra.id,
+                original_filename=stored['original_filename'],
+                stored_filename=stored['stored_filename'],
+                content_type=stored['content_type'],
+                file_size=stored['file_size']
+            )
+            db.session.add(record)
+            created.append(record)
+
+            if not compra.attachment_path:
+                compra.attachment_path = stored['stored_filename']
+
+        if not created:
+            return jsonify({
+                'success': False,
+                'message': 'Nenhum anexo valido foi enviado.',
+                'rejected': rejected
+            }), 400
+
+        db.session.commit()
+        attachments = _collect_compra_attachments(compra)
+        return jsonify({
+            'success': True,
+            'attachments': attachments,
+            'total_attachments': len(attachments),
+            'rejected': rejected
+        })
+
+    # DELETE
+    data = request.get_json(silent=True) or request.form or {}
+    attachment_id_raw = data.get('attachment_id')
+    stored_filename_raw = data.get('stored_filename')
+
+    attachment_id = None
+    if attachment_id_raw not in (None, ''):
+        try:
+            attachment_id = int(attachment_id_raw)
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'message': 'Anexo invalido.'}), 400
+
+    stored_filename = None
+    if stored_filename_raw:
+        stored_filename = Path(str(stored_filename_raw)).name
+        if stored_filename != str(stored_filename_raw):
+            return jsonify({'success': False, 'message': 'Arquivo invalido.'}), 400
+
+    removed_filename = None
+    if attachment_id and attachment_id > 0:
+        record = CompraAttachment.query.filter_by(id=attachment_id, compra_id=compra.id).first()
+        if not record:
+            return jsonify({'success': False, 'message': 'Anexo nao encontrado.'}), 404
+        removed_filename = record.stored_filename
+        db.session.delete(record)
+    elif stored_filename:
+        record = CompraAttachment.query.filter_by(compra_id=compra.id, stored_filename=stored_filename).first()
+        if record:
+            removed_filename = record.stored_filename
+            db.session.delete(record)
+        elif compra.attachment_path == stored_filename:
+            removed_filename = stored_filename
+        else:
+            return jsonify({'success': False, 'message': 'Anexo nao encontrado.'}), 404
+    else:
+        return jsonify({'success': False, 'message': 'Informe o anexo para remover.'}), 400
+
+    if removed_filename and compra.attachment_path == removed_filename:
+        remaining = (CompraAttachment.query
+                     .filter_by(compra_id=compra.id)
+                     .order_by(CompraAttachment.data_criacao.asc())
+                     .all())
+        compra.attachment_path = remaining[0].stored_filename if remaining else None
+
+    db.session.commit()
+    attachments = _collect_compra_attachments(compra)
+    return jsonify({
+        'success': True,
+        'attachments': attachments,
+        'total_attachments': len(attachments)
+    })
+
+
 @blueprint.route('/api/compras/<int:compra_id>/aprovar', methods=['POST'])
 @login_required
 def api_aprovar_compra(compra_id):
