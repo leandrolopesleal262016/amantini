@@ -1229,7 +1229,9 @@ def api_update_task_status(task_id):
     data = request.get_json() or {}
     new_status = data.get('status')
     new_position = data.get('posicao', 0)
-    task = Task.query.filter_by(id=task_id).first_or_404()
+    task = Task.query.filter_by(id=task_id, usuario_id=current_user.id).first()
+    if not task:
+        return jsonify({'success': False, 'message': 'Tarefa não encontrada.'}), 404
     # Validar status válido
     valid_statuses = ['Pendente', 'Em Progresso', 'Finalizado']
     if new_status not in valid_statuses:
@@ -1250,7 +1252,9 @@ def api_update_task_status(task_id):
 @login_required
 def api_update_task(task_id):
     data = request.get_json() or {}
-    task = Task.query.filter_by(id=task_id).first_or_404()
+    task = Task.query.filter_by(id=task_id, usuario_id=current_user.id).first()
+    if not task:
+        return jsonify({'success': False, 'message': 'Tarefa não encontrada.'}), 404
     # Campos permitidos para atualização
     title = data.get('title')
     description = data.get('description')
@@ -1291,7 +1295,9 @@ def api_update_task(task_id):
 @login_required
 def api_task_attachments(task_id):
     """Lista, adiciona e remove anexos de uma tarefa."""
-    task = Task.query.filter_by(id=task_id, usuario_id=current_user.id).first_or_404()
+    task = Task.query.filter_by(id=task_id, usuario_id=current_user.id).first()
+    if not task:
+        return jsonify({'success': False, 'message': 'Tarefa não encontrada.'}), 404
 
     can_store_task_attachments = True
     try:
@@ -1426,7 +1432,9 @@ def api_complete_task(task_id):
 
 
     # Busca a tarefa do usuário logado
-    task = Task.query.filter_by(id=task_id).first_or_404()
+    task = Task.query.filter_by(id=task_id, usuario_id=current_user.id).first()
+    if not task:
+        return jsonify({'success': False, 'message': 'Tarefa não encontrada.'}), 404
 
     # Dados podem vir via multipart/form-data (com arquivo) ou JSON
     data = request.form if request.form else (request.get_json() or {})
@@ -2519,6 +2527,7 @@ def tasks():
     As tarefas são carregadas do banco de dados e ordenadas pela posição.
     """
     tasks = (Task.query
+             .filter_by(usuario_id=current_user.id)
              .order_by(Task.posicao)
              .all())
 

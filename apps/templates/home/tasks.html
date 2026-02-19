@@ -524,6 +524,19 @@
 <script>
     const selectedTaskAttachments = [];
     let currentEditingCard = null;
+    
+    async function readApiError(response, fallbackMessage) {
+        const contentType = (response.headers.get('content-type') || '').toLowerCase();
+        if (contentType.includes('application/json')) {
+            try {
+                const data = await response.json();
+                return data.message || fallbackMessage;
+            } catch (e) {
+                return fallbackMessage;
+            }
+        }
+        return fallbackMessage;
+    }
 
     function renderTaskAttachmentsList() {
         const list = document.getElementById('taskAttachmentsList');
@@ -667,11 +680,9 @@
             method: 'POST',
             body: formData
         })
-        .then(response => {
+        .then(async response => {
             if (!response.ok) {
-                return response.json().then(data => {
-                    throw new Error(data.message || 'Erro ao enviar anexos');
-                });
+                throw new Error(await readApiError(response, 'Erro ao enviar anexos'));
             }
             return response.json();
         })
@@ -708,11 +719,9 @@
                 stored_filename: storedFilename || ''
             })
         })
-        .then(response => {
+        .then(async response => {
             if (!response.ok) {
-                return response.json().then(data => {
-                    throw new Error(data.message || 'Erro ao remover anexo');
-                });
+                throw new Error(await readApiError(response, 'Erro ao remover anexo'));
             }
             return response.json();
         })
@@ -1098,9 +1107,9 @@
             method: 'POST',
             body: formData
         })
-        .then(response => {
+        .then(async response => {
             if (!response.ok) {
-                return response.json().then(data => { throw new Error(data.message || 'Erro ao concluir a tarefa'); });
+                throw new Error(await readApiError(response, 'Erro ao concluir a tarefa'));
             }
             return response.json();
         })
