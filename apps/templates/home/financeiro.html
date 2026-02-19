@@ -36,10 +36,11 @@
                             <thead class="thead-light">
                                 <tr>
                                     <th scope="col">Titulo</th>
+                                    <th scope="col">Obra</th>
                                     <th scope="col">Responsavel</th>
-                                    <th scope="col">Valor do orcamento</th>
-                                    <th scope="col">Concluida em</th>
-                                    <th scope="col">Tempo na coluna</th>
+                                    <th scope="col">Orcamento</th>
+                                    <th scope="col">Concluida</th>
+                                    <th scope="col">Duracao</th>
                                     <th scope="col">Anexos</th>
                                 </tr>
                             </thead>
@@ -52,6 +53,9 @@
                                     data-observations="{{ tarefa.observations }}"
                                     data-priority="{{ tarefa.priority }}"
                                     data-assignee="{{ tarefa.assignee }}"
+                                    data-obra-id="{{ tarefa.obra_id or '' }}"
+                                    data-obra="{{ tarefa.obra_nome or '-' }}"
+                                    data-obra-endereco="{{ tarefa.obra_endereco or '' }}"
                                     data-due-date="{{ tarefa.due_date.isoformat() if tarefa.due_date else '' }}"
                                     data-status="{{ tarefa.status }}"
                                     data-data-criacao="{{ tarefa.data_criacao_local_str or '' }}"
@@ -60,6 +64,7 @@
                                     data-download-all-url="{{ tarefa.finance_attachments_zip_url }}"
                                     data-attachments='{{ tarefa.finance_attachments|tojson|forceescape }}'>
                                     <th scope="row">{{ tarefa.title }}</th>
+                                    <td>{{ tarefa.obra_nome or '-' }}</td>
                                     <td>{{ tarefa.assignee or '-' }}</td>
                                     <td>
                                         {% if tarefa.orcamento_valor is not none %}
@@ -107,6 +112,7 @@
                     <p><strong>Descricao:</strong> <span id="fin-description"></span></p>
                     <p><strong>Observacoes:</strong> <span id="fin-observations"></span></p>
                     <p><strong>Prioridade:</strong> <span id="fin-priority"></span></p>
+                    <p><strong>Obra:</strong> <span id="fin-obra"></span></p>
                     <p><strong>Responsavel:</strong> <span id="fin-assignee"></span></p>
                     <p><strong>Data de vencimento:</strong> <span id="fin-due-date"></span></p>
                     <p><strong>Status:</strong> <span id="fin-status"></span></p>
@@ -134,6 +140,9 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('fin-description').textContent = this.getAttribute('data-description') || '';
             document.getElementById('fin-observations').textContent = this.getAttribute('data-observations') || '';
             document.getElementById('fin-priority').textContent = this.getAttribute('data-priority') || '';
+            const obraNome = this.getAttribute('data-obra') || '-';
+            const obraEndereco = this.getAttribute('data-obra-endereco') || '';
+            document.getElementById('fin-obra').textContent = obraEndereco ? `${obraNome} - ${obraEndereco}` : obraNome;
             document.getElementById('fin-assignee').textContent = this.getAttribute('data-assignee') || '';
             const dueDate = this.getAttribute('data-due-date');
             document.getElementById('fin-due-date').textContent = dueDate ? new Date(dueDate).toLocaleDateString('pt-BR') : '';

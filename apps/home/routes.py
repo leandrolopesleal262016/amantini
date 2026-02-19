@@ -164,8 +164,11 @@ def _build_obra_card(nome, endereco, pedidos):
     }
 
 
-def load_pedidos_for_kanban():
+def load_pedidos_for_kanban(usuario_id=None):
     pedidos = (PedidoCompra.query
+               .filter_by(usuario_id=usuario_id) if usuario_id is not None else PedidoCompra.query
+               )
+    pedidos = (pedidos
                .order_by(PedidoCompra.posicao, PedidoCompra.id)
                .all())
 
@@ -182,10 +185,13 @@ def load_pedidos_for_kanban():
     return pedidos
 
 
-def build_obras_overview_cards():
+def build_obras_overview_cards(usuario_id=None):
     """Build data cards for the principal page grouped by obra."""
-    obras, obras_enabled = safe_obras_list()
+    obras, obras_enabled = safe_obras_list(usuario_id)
     pedidos = (PedidoCompra.query
+               .filter_by(usuario_id=usuario_id) if usuario_id is not None else PedidoCompra.query
+               )
+    pedidos = (pedidos
                .order_by(PedidoCompra.data_criacao.desc())
                .all())
 
@@ -504,16 +510,81 @@ def _collect_completed_task_attachments(completed_task):
     return attachments
 
 
+def _list_completed_task_workflows(completed_task):
+    """Lista workflows relacionados ao pedido concluído no contexto do usuário dono do registro."""
+    if not completed_task or not completed_task.original_task_id:
+        return []
+
+    cached = getattr(completed_task, '_related_workflows_cache', None)
+    if cached is not None:
+        return cached
+
+    try:
+        workflows = (CompraWorkflow.query
+                     .join(Compra, Compra.id == CompraWorkflow.compra_id)
+                     .filter(
+                         CompraWorkflow.pedido_id == completed_task.original_task_id,
+                         Compra.usuario_id == completed_task.usuario_id
+                     )
+                     .order_by(CompraWorkflow.data_aprovacao.desc(), CompraWorkflow.id.desc())
+                     .all())
+        setattr(completed_task, '_related_workflows_cache', workflows)
+        return workflows
+    except Exception:
+        setattr(completed_task, '_related_workflows_cache', [])
+        return []
+
+
+def _pick_completed_task_workflow(completed_task):
+    """Escolhe o workflow mais provável para o registro concluído."""
+    workflows = _list_completed_task_workflows(completed_task)
+    if not workflows:
+        return None
+    if len(workflows) == 1:
+        return workflows[0]
+
+    if completed_task and completed_task.data_conclusao:
+        workflows_with_date = [wf for wf in workflows if wf.data_aprovacao]
+        if workflows_with_date:
+            return min(
+                workflows_with_date,
+                key=lambda wf: abs((completed_task.data_conclusao - wf.data_aprovacao).total_seconds())
+            )
+
+    return workflows[0]
+
+
+def _resolve_completed_task_obra(completed_task):
+    """Resolve obra (id/nome/endereço) para uso no histórico do financeiro."""
+    workflow = _pick_completed_task_workflow(completed_task)
+    if workflow:
+        obra = workflow.obra_rel
+        if not obra and workflow.obra_id:
+            obra = Obra.query.filter_by(id=workflow.obra_id, usuario_id=completed_task.usuario_id).first()
+
+        if obra:
+            return {
+                'id': obra.id,
+                'nome': obra.nome,
+                'endereco': obra.endereco or ''
+            }
+
+    source_text = (completed_task.description or '')
+    match = re.search(r'obra\s*:\s*([^|]+)', source_text, flags=re.IGNORECASE)
+    nome_fallback = match.group(1).strip() if match else ''
+    if nome_fallback:
+        return {'id': None, 'nome': nome_fallback, 'endereco': ''}
+
+    return {'id': None, 'nome': '-', 'endereco': ''}
+
+
 def _collect_finance_attachments(completed_task):
     """Coleta anexos do financeiro com fallback para o serviço de origem."""
     attachments = _collect_completed_task_attachments(completed_task)
     if attachments:
         return attachments
 
-    if not completed_task or not completed_task.original_task_id:
-        return attachments
-
-    workflow = CompraWorkflow.query.filter_by(pedido_id=completed_task.original_task_id).first()
+    workflow = _pick_completed_task_workflow(completed_task)
     if not workflow or not workflow.compra:
         return attachments
 
@@ -583,13 +654,18 @@ def _resolve_completed_task_orcamento_valor(completed_task):
             continue
 
         compra = Compra.query.filter_by(id=compra_id, usuario_id=completed_task.usuario_id).first()
-        if not compra:
-            compra = Compra.query.filter_by(id=compra_id).first()
         if compra and compra.valor is not None:
             try:
                 return float(compra.valor)
             except (TypeError, ValueError):
                 continue
+
+    workflow = _pick_completed_task_workflow(completed_task)
+    if workflow and workflow.compra and workflow.compra.valor is not None:
+        try:
+            return float(workflow.compra.valor)
+        except (TypeError, ValueError):
+            pass
 
     for source_text in source_texts:
         if not source_text:
@@ -599,29 +675,6 @@ def _resolve_completed_task_orcamento_valor(completed_task):
             parsed = _parse_currency_to_float(match.group(1))
             if parsed is not None:
                 return parsed
-
-    if completed_task.original_task_id:
-        workflows = CompraWorkflow.query.filter_by(pedido_id=completed_task.original_task_id).all()
-        candidates = [wf for wf in workflows if wf.compra and wf.compra.valor is not None]
-
-        if len(candidates) == 1:
-            try:
-                return float(candidates[0].compra.valor)
-            except (TypeError, ValueError):
-                pass
-
-        if len(candidates) > 1 and completed_task.data_conclusao:
-            prior = [wf for wf in candidates if wf.data_aprovacao and wf.data_aprovacao <= completed_task.data_conclusao]
-            basis = prior if prior else [wf for wf in candidates if wf.data_aprovacao]
-            if basis:
-                nearest = min(
-                    basis,
-                    key=lambda wf: abs((completed_task.data_conclusao - wf.data_aprovacao).total_seconds())
-                )
-                try:
-                    return float(nearest.compra.valor)
-                except (TypeError, ValueError):
-                    pass
 
     return None
 
@@ -750,7 +803,7 @@ def download_financeiro_attachments_zip(completed_task_id):
 @login_required
 def pedidos_compra():
     """Exibe o quadro Kanban de pedidos de compra."""
-    pedidos = load_pedidos_for_kanban()
+    pedidos = load_pedidos_for_kanban(current_user.id)
     return render_template('home/pedidos_compra_kanban.html', pedidos=pedidos, segment='pedidos')
 
 @blueprint.route('/pedidos-compra/novo')
@@ -760,7 +813,7 @@ def novo_pedido_compra():
     materiais = (Material.query
                  .order_by(Material.nome)
                  .all())
-    obras, obras_enabled = safe_obras_list()
+    obras, obras_enabled = safe_obras_list(current_user.id)
     return render_template(
         'home/pedido_compra_form.html',
         obras=obras,
@@ -775,29 +828,21 @@ def novo_pedido_compra():
 def criar_pedido_compra():
     """Cria um novo pedido de compra"""
     try:
-        use_obras = obras_feature_enabled()
+        obra_id_raw = request.form.get('obra_id')
+        if not obra_id_raw:
+            raise ValueError('Selecione uma obra válida.')
+        try:
+            obra_id = int(obra_id_raw)
+        except (TypeError, ValueError):
+            raise ValueError('Obra selecionada é inválida.')
 
-        if use_obras:
-            obra_id_raw = request.form.get('obra_id')
-            if not obra_id_raw:
-                raise ValueError('Selecione uma obra válida.')
-            try:
-                obra_id = int(obra_id_raw)
-            except (TypeError, ValueError):
-                raise ValueError('Obra selecionada é inválida.')
-            obra = Obra.query.filter_by(id=obra_id).first()
-            if not obra:
-                raise ValueError('Obra selecionada não encontrada.')
+        obra = Obra.query.filter_by(id=obra_id, usuario_id=current_user.id).first()
+        if not obra:
+            raise ValueError('Obra selecionada não encontrada.')
 
-            obra_nome = obra.nome
-            obra_id_final = obra.id
-            obra_endereco = obra.endereco
-        else:
-            obra_nome = (request.form.get('obra_nome_manual') or request.form.get('obra') or 'FAGA').strip()
-            if not obra_nome:
-                obra_nome = 'FAGA'
-            obra_id_final = None
-            obra_endereco = request.form.get('obra_endereco_manual', '').strip() or None
+        obra_nome = obra.nome
+        obra_id_final = obra.id
+        obra_endereco = obra.endereco
 
         data_necessidade_str = request.form.get('data_necessidade')
         if not data_necessidade_str:
@@ -848,7 +893,7 @@ def criar_pedido_compra():
 @login_required
 def ver_pedido_compra(pedido_id):
     """Visualiza um pedido específico"""
-    pedido = PedidoCompra.query.filter_by(id=pedido_id).first_or_404()
+    pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
     attach_local_datetime_fields(pedido, ['data_criacao'])
     dias_decorridos = None
     if pedido.data_criacao_local:
@@ -864,7 +909,7 @@ def ver_pedido_compra(pedido_id):
 @login_required
 def pedido_compra_pdf(pedido_id):
     """Gera um PDF com os dados completos do pedido de compra."""
-    pedido = PedidoCompra.query.filter_by(id=pedido_id).first_or_404()
+    pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
     data_criacao_local = utc_naive_to_local(pedido.data_criacao)
     data_criacao_local_str = data_criacao_local.strftime('%d/%m/%Y %H:%M') if data_criacao_local else '-'
 
@@ -943,12 +988,12 @@ def editar_pedido_compra(pedido_id):
 
     """Edita um pedido de compra"""
 
-    pedido = PedidoCompra.query.filter_by(id=pedido_id).first_or_404()
+    pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
     materiais = (Material.query
                  .order_by(Material.nome)
                  .all())
 
-    obras, obras_enabled = safe_obras_list()
+    obras, obras_enabled = safe_obras_list(current_user.id)
 
     return render_template(
 
@@ -979,31 +1024,22 @@ def editar_pedido_compra(pedido_id):
 def atualizar_pedido_compra(pedido_id):
     """Atualiza um pedido de compra"""
     try:
-        pedido = PedidoCompra.query.filter_by(id=pedido_id).first_or_404()
-        use_obras = obras_feature_enabled()
+        pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
+        obra_id_raw = request.form.get('obra_id')
+        if not obra_id_raw:
+            raise ValueError('Selecione uma obra válida.')
+        try:
+            obra_id = int(obra_id_raw)
+        except (TypeError, ValueError):
+            raise ValueError('Obra selecionada é inválida.')
 
-        if use_obras:
-            obra_id_raw = request.form.get('obra_id')
-            if not obra_id_raw:
-                raise ValueError('Selecione uma obra válida.')
-            try:
-                obra_id = int(obra_id_raw)
-            except (TypeError, ValueError):
-                raise ValueError('Obra selecionada é inválida.')
-            obra = Obra.query.filter_by(id=obra_id).first()
-            if not obra:
-                raise ValueError('Obra selecionada não encontrada.')
+        obra = Obra.query.filter_by(id=obra_id, usuario_id=current_user.id).first()
+        if not obra:
+            raise ValueError('Obra selecionada não encontrada.')
 
-            pedido.obra = obra.nome
-            pedido.obra_id = obra.id
-            pedido.obra_endereco = obra.endereco
-        else:
-            obra_nome = (request.form.get('obra_nome_manual') or request.form.get('obra') or pedido.obra or 'FAGA').strip()
-            pedido.obra = obra_nome or 'FAGA'
-            pedido.obra_id = None
-            manual_endereco = request.form.get('obra_endereco_manual', '').strip()
-            if manual_endereco:
-                pedido.obra_endereco = manual_endereco
+        pedido.obra = obra.nome
+        pedido.obra_id = obra.id
+        pedido.obra_endereco = obra.endereco
 
         # Atualizar dados do pedido
         pedido.responsavel = request.form.get('responsavel')
@@ -1046,30 +1082,21 @@ def api_criar_pedido():
     """API endpoint para criar pedido via AJAX"""
     try:
         dados = request.get_json() or {}
+        obra_id_raw = dados.get('obra_id')
+        if not obra_id_raw:
+            raise ValueError('Selecione uma obra válida.')
+        try:
+            obra_id = int(obra_id_raw)
+        except (TypeError, ValueError):
+            raise ValueError('Obra selecionada é inválida.')
 
-        use_obras = obras_feature_enabled()
+        obra = Obra.query.filter_by(id=obra_id, usuario_id=current_user.id).first()
+        if not obra:
+            raise ValueError('Obra selecionada não encontrada.')
 
-        if use_obras:
-            obra_id_raw = dados.get('obra_id')
-            if not obra_id_raw:
-                raise ValueError('Selecione uma obra válida.')
-            try:
-                obra_id = int(obra_id_raw)
-            except (TypeError, ValueError):
-                raise ValueError('Obra selecionada é inválida.')
-            obra = Obra.query.filter_by(id=obra_id).first()
-            if not obra:
-                raise ValueError('Obra selecionada não encontrada.')
-
-            obra_nome = obra.nome
-            obra_id_final = obra.id
-            obra_endereco = obra.endereco
-        else:
-            obra_nome = (dados.get('obra_nome') or dados.get('obra') or 'FAGA').strip()
-            if not obra_nome:
-                obra_nome = 'FAGA'
-            obra_id_final = None
-            obra_endereco = (dados.get('obra_endereco') or '').strip() or None
+        obra_nome = obra.nome
+        obra_id_final = obra.id
+        obra_endereco = obra.endereco
 
         data_necessidade_str = dados.get('dataNecessidade')
         if not data_necessidade_str:
@@ -1525,6 +1552,7 @@ def tarefas_concluidas():
     """
     # Buscar tarefas concluídas ordenadas por data de conclusão decrescente
     completadas = (CompletedTask.query
+                   .filter_by(usuario_id=current_user.id)
                    .order_by(CompletedTask.data_conclusao.desc())
                    .all())
     # Converter duração para dias inteiros em vez de HH:MM:SS
@@ -1601,6 +1629,7 @@ def api_criar_obra():
     endereco = endereco[:255] if endereco else None
 
     existente = (Obra.query
+                 .filter(Obra.usuario_id == current_user.id)
                  .filter(Obra.nome.ilike(nome))
                  .first())
     if existente:
@@ -2058,7 +2087,7 @@ def api_aprovar_compra(compra_id):
                 'pedido_id': workflow.pedido_id
             }), 400
 
-        obra = workflow.obra_rel or Obra.query.filter_by(id=workflow.obra_id).first()
+        obra = workflow.obra_rel or Obra.query.filter_by(id=workflow.obra_id, usuario_id=current_user.id).first()
         if not obra:
             return jsonify({'success': False, 'message': 'Obra vinculada não encontrada.'}), 404
 
@@ -2141,7 +2170,7 @@ def api_aprovar_compra(compra_id):
 @login_required
 def pedidos_compra_kanban():
     """Exibe o quadro Kanban de pedidos de compra"""
-    pedidos = load_pedidos_for_kanban()
+    pedidos = load_pedidos_for_kanban(current_user.id)
     return render_template('home/pedidos_compra_kanban.html', pedidos=pedidos, segment='pedidos')
 
 
@@ -2296,7 +2325,13 @@ def concluir_pedido_compra(pedido_id):
     itens_count = len(pedido.itens or [])
     pedido_attachments = list(pedido.attachments or [])
     if not pedido_attachments:
-        workflow = CompraWorkflow.query.filter_by(pedido_id=pedido.id).first()
+        workflow = (CompraWorkflow.query
+                    .join(Compra, Compra.id == CompraWorkflow.compra_id)
+                    .filter(
+                        CompraWorkflow.pedido_id == pedido.id,
+                        Compra.usuario_id == current_user.id
+                    )
+                    .first())
         if workflow and workflow.compra:
             pedido_attachments = list(workflow.compra.attachments or [])
             if not pedido_attachments and workflow.compra.attachment_path:
@@ -2365,7 +2400,7 @@ def index():
 @blueprint.route('/principal')
 @login_required
 def principal():
-    obra_cards, obras_enabled = build_obras_overview_cards()
+    obra_cards, obras_enabled = build_obras_overview_cards(current_user.id)
 
     total_pedidos = sum(card['total_pedidos'] for card in obra_cards)
     total_entregues = sum(card['status']['entregue'] for card in obra_cards)
@@ -2373,7 +2408,7 @@ def principal():
 
     compras_total = 0
     try:
-        compras_total = Compra.query.count()
+        compras_total = Compra.query.filter_by(usuario_id=current_user.id).count()
     except (OperationalError, ProgrammingError):
         db.session.rollback()
         compras_total = 0
@@ -2629,6 +2664,10 @@ def financeiro():
             tarefa.duration_display = ''
 
         tarefa.orcamento_valor = _resolve_completed_task_orcamento_valor(tarefa)
+        obra_info = _resolve_completed_task_obra(tarefa)
+        tarefa.obra_id = obra_info.get('id')
+        tarefa.obra_nome = obra_info.get('nome') or '-'
+        tarefa.obra_endereco = obra_info.get('endereco') or ''
         tarefa.finance_attachments = _collect_finance_attachments(tarefa)
         tarefa.finance_attachments_zip_url = url_for('home_blueprint.download_financeiro_attachments_zip', completed_task_id=tarefa.id)
     return render_template('home/financeiro.html', tarefas=aguardando, segment='financeiro')
