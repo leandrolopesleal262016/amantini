@@ -361,6 +361,19 @@
 <script>
     let currentPedidoCard = null;
 
+    async function readApiError(response, fallbackMessage) {
+        const contentType = (response.headers.get('content-type') || '').toLowerCase();
+        if (contentType.includes('application/json')) {
+            try {
+                const data = await response.json();
+                return data.message || fallbackMessage;
+            } catch (e) {
+                return fallbackMessage;
+            }
+        }
+        return fallbackMessage;
+    }
+
     function statusToLabel(status) {
         if (status === 'pendente') return 'Pendente';
         if (status === 'em_cotacao') return 'Em cotacao';
@@ -445,8 +458,10 @@
     function loadPedidoAttachments(pedidoId) {
         if (!pedidoId) return;
         fetch(`/api/pedidos-compra/${pedidoId}/attachments`)
-        .then(response => {
-            if (!response.ok) throw new Error('Erro ao carregar anexos');
+        .then(async response => {
+            if (!response.ok) {
+                throw new Error(await readApiError(response, 'Erro ao carregar anexos'));
+            }
             return response.json();
         })
         .then(data => {
@@ -479,11 +494,9 @@
             method: 'POST',
             body: formData
         })
-        .then(response => {
+        .then(async response => {
             if (!response.ok) {
-                return response.json().then(data => {
-                    throw new Error(data.message || 'Erro ao enviar anexos');
-                });
+                throw new Error(await readApiError(response, 'Erro ao enviar anexos'));
             }
             return response.json();
         })
@@ -521,11 +534,9 @@
                 stored_filename: storedFilename || ''
             })
         })
-        .then(response => {
+        .then(async response => {
             if (!response.ok) {
-                return response.json().then(data => {
-                    throw new Error(data.message || 'Erro ao remover anexo');
-                });
+                throw new Error(await readApiError(response, 'Erro ao remover anexo'));
             }
             return response.json();
         })
@@ -655,11 +666,9 @@
         fetch(`/api/pedidos-compra/${pedidoId}/complete`, {
             method: 'POST'
         })
-        .then(response => {
+        .then(async response => {
             if (!response.ok) {
-                return response.json().then(data => {
-                    throw new Error(data.message || 'Erro ao concluir pedido');
-                });
+                throw new Error(await readApiError(response, 'Erro ao concluir pedido'));
             }
             return response.json();
         })

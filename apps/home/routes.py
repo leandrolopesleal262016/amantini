@@ -2190,7 +2190,9 @@ def atualizar_status_pedido(pedido_id):
     novo_status = normalize_pedido_status(data.get('status'))
     nova_posicao = data.get('posicao', 0)
     # Garantir que o pedido existe e pertence ao usuário atual
-    pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
+    pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first()
+    if not pedido:
+        return jsonify({'success': False, 'message': 'Pedido não encontrado.'}), 404
     # Validar o status
     if novo_status not in PEDIDO_STATUS_VALID:
         return jsonify({'success': False, 'message': 'Status inválido'}), 400
@@ -2208,7 +2210,9 @@ def atualizar_status_pedido(pedido_id):
 @login_required
 def pedido_compra_attachments(pedido_id):
     """Lista e cadastra anexos de um pedido de compra."""
-    pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
+    pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first()
+    if not pedido:
+        return jsonify({'success': False, 'message': 'Pedido não encontrado.'}), 404
 
     if request.method == 'GET':
         attachments = (PedidoCompraAttachment.query
@@ -2322,81 +2326,87 @@ def pedido_compra_attachments(pedido_id):
 @login_required
 def concluir_pedido_compra(pedido_id):
     """Conclui um pedido entregue e move o registro para Financeiro."""
-    pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
+    try:
+        pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first()
+        if not pedido:
+            return jsonify({'success': False, 'message': 'Pedido não encontrado.'}), 404
 
-    status = normalize_pedido_status(pedido.status) or 'pendente'
-    if status != 'entregue':
-        return jsonify({'success': False, 'message': 'O pedido precisa estar em Entregue para concluir.'}), 400
+        status = normalize_pedido_status(pedido.status) or 'pendente'
+        if status != 'entregue':
+            return jsonify({'success': False, 'message': 'O pedido precisa estar em Entregue para concluir.'}), 400
 
-    completion_time = datetime.utcnow()
-    duration_seconds = int((completion_time - pedido.data_criacao).total_seconds()) if pedido.data_criacao else None
-    itens_count = len(pedido.itens or [])
-    pedido_attachments = list(pedido.attachments or [])
-    if not pedido_attachments:
-        workflow = (CompraWorkflow.query
-                    .join(Compra, Compra.id == CompraWorkflow.compra_id)
-                    .filter(
-                        CompraWorkflow.pedido_id == pedido.id,
-                        Compra.usuario_id == current_user.id
-                    )
-                    .first())
-        if workflow and workflow.compra:
-            pedido_attachments = list(workflow.compra.attachments or [])
-            if not pedido_attachments and workflow.compra.attachment_path:
-                fallback_name = Path(workflow.compra.attachment_path).name
-                fallback_path = _resolve_existing_attachment_file(fallback_name)
-                pedido_attachments = [{
-                    'original_filename': fallback_name,
-                    'stored_filename': fallback_name,
-                    'content_type': None,
-                    'file_size': (os.path.getsize(fallback_path) if fallback_path else None)
-                }]
+        completion_time = datetime.utcnow()
+        duration_seconds = int((completion_time - pedido.data_criacao).total_seconds()) if pedido.data_criacao else None
+        itens_count = len(pedido.itens or [])
+        pedido_attachments = list(pedido.attachments or [])
+        if not pedido_attachments:
+            workflow = (CompraWorkflow.query
+                        .join(Compra, Compra.id == CompraWorkflow.compra_id)
+                        .filter(
+                            CompraWorkflow.pedido_id == pedido.id,
+                            Compra.usuario_id == current_user.id
+                        )
+                        .first())
+            if workflow and workflow.compra:
+                pedido_attachments = list(workflow.compra.attachments or [])
+                if not pedido_attachments and workflow.compra.attachment_path:
+                    fallback_name = Path(workflow.compra.attachment_path).name
+                    fallback_path = _resolve_existing_attachment_file(fallback_name)
+                    pedido_attachments = [{
+                        'original_filename': fallback_name,
+                        'stored_filename': fallback_name,
+                        'content_type': None,
+                        'file_size': (os.path.getsize(fallback_path) if fallback_path else None)
+                    }]
 
-    def _att_field(att, field_name, default=None):
-        if isinstance(att, dict):
-            return att.get(field_name, default)
-        return getattr(att, field_name, default)
+        def _att_field(att, field_name, default=None):
+            if isinstance(att, dict):
+                return att.get(field_name, default)
+            return getattr(att, field_name, default)
 
-    data_necessidade = pedido.data_necessidade.strftime('%d/%m/%Y') if pedido.data_necessidade else '-'
-    prioridade = (pedido.prioridade or '-').title()
+        data_necessidade = pedido.data_necessidade.strftime('%d/%m/%Y') if pedido.data_necessidade else '-'
+        prioridade = (pedido.prioridade or '-').title()
 
-    completed = CompletedTask(
-        original_task_id=pedido.id,
-        title=f"Pedido #{pedido.id} - {pedido.obra or 'Obra sem nome'}",
-        description=f"Obra: {pedido.obra or '-'} | Itens: {itens_count} | Data necessidade: {data_necessidade}",
-        observations=pedido.observacoes,
-        priority=prioridade,
-        assignee=pedido.responsavel,
-        due_date=pedido.data_necessidade,
-        status='Aguardando Nota/Boleto',
-        data_criacao=pedido.data_criacao,
-        data_conclusao=completion_time,
-        duration_seconds=duration_seconds,
-        usuario_id=pedido.usuario_id,
-        attachment_path=(_att_field(pedido_attachments[0], 'stored_filename') if pedido_attachments else None)
-    )
-
-    db.session.add(completed)
-    db.session.flush()
-
-    for att in pedido_attachments:
-        stored_filename = _att_field(att, 'stored_filename')
-        if not stored_filename:
-            continue
-        original_filename = _att_field(att, 'original_filename') or stored_filename
-        completed_attachment = CompletedTaskAttachment(
-            completed_task_id=completed.id,
-            original_filename=original_filename,
-            stored_filename=stored_filename,
-            content_type=_att_field(att, 'content_type'),
-            file_size=_att_field(att, 'file_size')
+        completed = CompletedTask(
+            original_task_id=pedido.id,
+            title=f"Pedido #{pedido.id} - {pedido.obra or 'Obra sem nome'}",
+            description=f"Obra: {pedido.obra or '-'} | Itens: {itens_count} | Data necessidade: {data_necessidade}",
+            observations=pedido.observacoes,
+            priority=prioridade,
+            assignee=pedido.responsavel,
+            due_date=pedido.data_necessidade,
+            status='Aguardando Nota/Boleto',
+            data_criacao=pedido.data_criacao,
+            data_conclusao=completion_time,
+            duration_seconds=duration_seconds,
+            usuario_id=pedido.usuario_id,
+            attachment_path=(_att_field(pedido_attachments[0], 'stored_filename') if pedido_attachments else None)
         )
-        db.session.add(completed_attachment)
 
-    db.session.delete(pedido)
-    db.session.commit()
+        db.session.add(completed)
+        db.session.flush()
 
-    return jsonify({'success': True, 'completed_id': completed.id})
+        for att in pedido_attachments:
+            stored_filename = _att_field(att, 'stored_filename')
+            if not stored_filename:
+                continue
+            original_filename = _att_field(att, 'original_filename') or stored_filename
+            completed_attachment = CompletedTaskAttachment(
+                completed_task_id=completed.id,
+                original_filename=original_filename,
+                stored_filename=stored_filename,
+                content_type=_att_field(att, 'content_type'),
+                file_size=_att_field(att, 'file_size')
+            )
+            db.session.add(completed_attachment)
+
+        db.session.delete(pedido)
+        db.session.commit()
+
+        return jsonify({'success': True, 'completed_id': completed.id})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro ao concluir pedido: {str(e)}'}), 500
 
 
 @blueprint.route('/index')
