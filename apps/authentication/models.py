@@ -122,7 +122,7 @@ class ItemPedido(db.Model):
 # MODELO DE TAREFA (TASK)
 # Define um quadro de tarefas independente do módulo de pedidos de compra.
 # Cada tarefa pertence a um usuário e possui um status que corresponde às colunas
-# existentes na interface de tarefas: Pendente, Em Progresso, Entregue, Aguardando Nota/Boleto.
+# existentes na interface de tarefas: Pendente, Em Progresso e Finalizado.
 
 class Task(db.Model):
     __tablename__ = 'tasks'
@@ -175,10 +175,8 @@ class CompletedTask(db.Model):
     duration_seconds = db.Column(db.Integer, nullable=True)
     usuario_id = db.Column(db.Integer, db.ForeignKey('Users.id'), nullable=False)
 
-    # Caminho do arquivo anexo (nota/boleta) relativo à pasta de upload.  
-    # Este campo é opcional porque apenas tarefas no status "Aguardando Nota/Boleto"
-    # exigem um anexo. Quando preenchido, o valor é o nome do arquivo salvo na
-    # pasta de uploads, permitindo que a aplicação gere links de download.
+    # Caminho do arquivo anexo (quando existir) relativo à pasta de upload.
+    # O campo é opcional e permite guardar arquivos vinculados à tarefa concluída.
     attachment_path = db.Column(db.String(255), nullable=True)
 
     # Caminho do arquivo de nota/ boleto anexado (relativo ao diretório de mídia)

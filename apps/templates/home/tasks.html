@@ -60,7 +60,7 @@
 
     @media (min-width: 1200px) {
         .kanban-board {
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(3, 1fr);
         }
     }
 
@@ -92,12 +92,8 @@
         background: linear-gradient(135deg, #11cdef, #17a2b8);
     }
 
-    .column-header.entregue {
+    .column-header.finalizado {
         background: linear-gradient(135deg, #2dce89, #28a745);
-    }
-
-    .column-header.aguardando {
-        background: linear-gradient(135deg, #ffa726, #ff7043);
     }
 
     .task-card {
@@ -128,12 +124,8 @@
         border-left-color: #11cdef;
     }
 
-    .task-card.entregue {
+    .task-card.finalizado {
         border-left-color: #2dce89;
-    }
-
-    .task-card.aguardando {
-        border-left-color: #ffa726;
     }
 
     .task-title {
@@ -362,15 +354,15 @@
                             </div>
                         </div>
 
-                        <!-- Coluna 3: Entregue -->
+                        <!-- Coluna 3: Finalizado -->
                         <div class="kanban-column">
-                            <div class="column-header entregue">
-                                <span>Entregue</span>
-                                <span class="task-counter" id="counter-entregue">0</span>
+                            <div class="column-header finalizado">
+                                <span>Finalizado</span>
+                                <span class="task-counter" id="counter-finalizado">0</span>
                             </div>
-                            <div class="task-list" id="entregue" data-status="Entregue">
-                                {% for task in tasks if task.status == 'Entregue' %}
-                                <div class="task-card entregue" draggable="true"
+                            <div class="task-list" id="finalizado" data-status="Finalizado">
+                                {% for task in tasks if task.status == 'Finalizado' %}
+                                <div class="task-card finalizado" draggable="true"
                                      data-id="{{ task.id }}"
                                      data-title="{{ task.title }}"
                                      data-priority="{{ task.priority }}"
@@ -383,43 +375,7 @@
                                     <div class="task-description">{{ task.description }}</div>
                                     <div class="task-footer">
                                         <div class="task-date">
-                                            {% if task.due_date %}Entregue: {{ task.due_date.strftime('%d/%m/%Y') }}{% else %}Sem prazo{% endif %}
-                                        </div>
-                                        <div class="task-avatar">
-                                            {% if task.assignee %}
-                                                {{ (task.assignee.split()[0][0] + (task.assignee.split()[1][0] if task.assignee.split()|length > 1 else '')).upper() }}
-                                            {% else %}
-                                                NA
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                </div>
-                                {% endfor %}
-                            </div>
-                        </div>
-
-                        <!-- Coluna 4: Aguardando Nota/Boleto -->
-                        <div class="kanban-column">
-                            <div class="column-header aguardando">
-                                <span>Aguardando Nota/Boleto</span>
-                                <span class="task-counter" id="counter-aguardando">0</span>
-                            </div>
-                            <div class="task-list" id="aguardando" data-status="Aguardando Nota/Boleto">
-                                {% for task in tasks if task.status == 'Aguardando Nota/Boleto' %}
-                                <div class="task-card aguardando" draggable="true"
-                                     data-id="{{ task.id }}"
-                                     data-title="{{ task.title }}"
-                                     data-priority="{{ task.priority }}"
-                                     data-description="{{ task.description }}"
-                                     data-assignee="{{ task.assignee }}"
-                                     data-due-date="{{ task.due_date.isoformat() if task.due_date else '' }}"
-                                     data-observations="{{ task.observations }}">
-                                    <div class="priority-badge priority-{{ task.priority|lower }}">{{ task.priority.upper() }}</div>
-                                    <div class="task-title">{{ task.title }}</div>
-                                    <div class="task-description">{{ task.description }}</div>
-                                    <div class="task-footer">
-                                        <div class="task-date">
-                                            {% if task.due_date %}Vence em: {{ task.due_date.strftime('%d/%m/%Y') }}{% else %}Sem prazo{% endif %}
+                                            {% if task.due_date %}Finalizado: {{ task.due_date.strftime('%d/%m/%Y') }}{% else %}Sem prazo{% endif %}
                                         </div>
                                         <div class="task-avatar">
                                             {% if task.assignee %}
@@ -530,11 +486,6 @@
                         <label for="edit-observations">Observações</label>
                         <textarea class="form-control" id="edit-observations" rows="3"></textarea>
                     </div>
-                    <!-- Campo para anexo de nota/boleta, visível apenas quando o status é "Aguardando Nota/Boleto" -->
-                    <div class="form-group" id="edit-attachment-group" style="display:none;">
-                        <label for="edit-attachment">Nota/Boleto (arquivo)</label>
-                        <input type="file" class="form-control" id="edit-attachment" accept=".pdf,.jpg,.jpeg,.png">
-                    </div>
                     <div class="form-group">
                         <label>Status</label>
                         <p id="edit-status" class="form-control-plaintext"></p>
@@ -542,7 +493,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <!-- Botão para concluir a tarefa, visível apenas quando o status for Aguardando Nota/Boleto -->
+                    <!-- Botão para concluir a tarefa, visível apenas no status Finalizado -->
                     <button type="button" class="btn btn-success" id="completeTaskBtn" style="display:none;" onclick="completeTask()">Concluir Tarefa</button>
                     <button type="button" class="btn btn-primary" onclick="saveTaskChanges()">Salvar</button>
                 </div>
@@ -629,11 +580,11 @@
 
     /**
      * Atualiza a classe CSS de um cartão com base no ID do contêiner
-     * (pendente, progresso, entregue ou aguardando) para ajustar as
+     * (pendente, progresso ou finalizado) para ajustar as
      * cores de borda e título.
      */
     function updateCardStyle(card, newContainerId) {
-        card.classList.remove('pendente', 'progresso', 'entregue', 'aguardando');
+        card.classList.remove('pendente', 'progresso', 'finalizado');
         card.classList.add(newContainerId);
     }
 
@@ -642,7 +593,7 @@
      * em cada contagem visualmente no cabeçalho.
      */
     function updateCounters() {
-        const columns = ['pendente', 'progresso', 'entregue', 'aguardando'];
+        const columns = ['pendente', 'progresso', 'finalizado'];
         columns.forEach(column => {
             const list = document.getElementById(column);
             const counter = document.getElementById(`counter-${column}`);
@@ -762,26 +713,13 @@
             // Exibe o modal de edição
             $('#taskDetailsModal').modal('show');
 
-        // Mostrar ou ocultar o botão "Concluir Tarefa" e o campo de anexo conforme o status
+        // Mostrar ou ocultar o botão "Concluir Tarefa" conforme o status
         const completeBtn = document.getElementById('completeTaskBtn');
-        const attachmentGroup = document.getElementById('edit-attachment-group');
-        const attachmentInput = document.getElementById('edit-attachment');
 
-        if (status === 'Aguardando Nota/Boleto') {
-            // Fluxo atual do Financeiro (mantido): exige anexo
+        if (status === 'Finalizado') {
             if (completeBtn) completeBtn.style.display = 'inline-block';
-            if (attachmentGroup) attachmentGroup.style.display = 'block';
-        } else if (status === 'Entregue') {
-            // Novo fluxo: concluir sem anexo -> vai para Tarefas Concluídas
-            if (completeBtn) completeBtn.style.display = 'inline-block';
-            if (attachmentGroup) attachmentGroup.style.display = 'none';
         } else {
             if (completeBtn) completeBtn.style.display = 'none';
-            if (attachmentGroup) attachmentGroup.style.display = 'none';
-        }
-
-        if (attachmentInput) {
-            attachmentInput.value = '';
         }
         }
     });
@@ -886,13 +824,6 @@
         const dueDate = document.getElementById('edit-due-date').value;
         const observations = document.getElementById('edit-observations').value.trim();
         const status = currentEditingCard.parentElement.getAttribute('data-status');
-        const attachmentInput = document.getElementById('edit-attachment');
-        const file = attachmentInput ? attachmentInput.files[0] : null;
-        // Se estiver aguardando nota/boleta, exigir o anexo
-        if (status === 'Aguardando Nota/Boleto' && (!file || !file.name)) {
-            alert('É necessário anexar a nota ou boleto antes de concluir a tarefa.');
-            return;
-        }
         const formData = new FormData();
         formData.append('title', title);
         formData.append('description', description);
@@ -901,9 +832,6 @@
         formData.append('assignee', assignee);
         formData.append('due_date', dueDate || '');
         formData.append('status', status);
-        if (file) {
-            formData.append('attachment', file);
-        }
         fetch(`/api/tasks/${taskId}/complete`, {
             method: 'POST',
             body: formData

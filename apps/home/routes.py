@@ -780,7 +780,7 @@ def api_update_task_status(task_id):
     new_position = data.get('posicao', 0)
     task = Task.query.filter_by(id=task_id).first_or_404()
     # Validar status válido
-    valid_statuses = ['Pendente', 'Em Progresso', 'Entregue', 'Aguardando Nota/Boleto']
+    valid_statuses = ['Pendente', 'Em Progresso', 'Finalizado']
     if new_status not in valid_statuses:
         return jsonify({'success': False, 'message': 'Status inválido'}), 400
     task.status = new_status
@@ -828,7 +828,7 @@ def api_update_task(task_id):
             except ValueError:
                 return jsonify({'success': False, 'message': 'Data de vencimento inválida'}), 400
     if status is not None:
-        valid_statuses = ['Pendente', 'Em Progresso', 'Entregue', 'Aguardando Nota/Boleto']
+        valid_statuses = ['Pendente', 'Em Progresso', 'Finalizado']
         if status not in valid_statuses:
             return jsonify({'success': False, 'message': 'Status inválido'}), 400
         task.status = status
@@ -881,7 +881,7 @@ def api_complete_task(task_id):
                 return jsonify({'success': False, 'message': 'Data de vencimento inválida'}), 400
 
     # Valida status
-    valid_statuses = ['Pendente', 'Em Progresso', 'Entregue', 'Aguardando Nota/Boleto']
+    valid_statuses = ['Pendente', 'Em Progresso', 'Finalizado']
     if status not in valid_statuses:
         return jsonify({'success': False, 'message': 'Status inválido'}), 400
     task.status = status
@@ -890,12 +890,8 @@ def api_complete_task(task_id):
     attachment_file = request.files.get('attachment') if 'attachment' in request.files else None
     attachment_path = None
 
-    # Regras por coluna:
-    # - Aguardando Nota/Boleto -> exige anexo (fluxo Financeiro inalterado)
-    # - Entregue -> não exige anexo (vai para Tarefas Concluídas)
-    if status == 'Aguardando Nota/Boleto':
-        if not attachment_file or attachment_file.filename == '':
-            return jsonify({'success': False, 'message': 'É necessário anexar a nota ou boleto para concluir a tarefa.'}), 400
+    # Se o cliente enviar um anexo opcional, salva junto ao registro concluído.
+    if attachment_file and attachment_file.filename:
         # Salva arquivo
         filename = secure_filename(attachment_file.filename)
         timestamp = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -905,6 +901,9 @@ def api_complete_task(task_id):
         file_full = os.path.join(upload_dir, filename)
         attachment_file.save(file_full)
         attachment_path = filename
+
+    if status != 'Finalizado':
+        return jsonify({'success': False, 'message': 'A tarefa precisa estar em Finalizado para concluir.'}), 400
 
     # Monta registro em CompletedTask (usamos a mesma tabela; páginas diferentes exibem fluxos diferentes)
     completion_time = datetime.utcnow()
@@ -1348,6 +1347,17 @@ def tasks():
     tasks = (Task.query
              .order_by(Task.posicao)
              .all())
+
+    # Normaliza status antigos para o novo fluxo sem dependência de financeiro.
+    status_legacy = {'Entregue', 'Aguardando Nota/Boleto'}
+    updated = False
+    for task in tasks:
+        if task.status in status_legacy:
+            task.status = 'Finalizado'
+            updated = True
+    if updated:
+        db.session.commit()
+
     return render_template('home/tasks.html', tasks=tasks, segment='tasks')
 
 
