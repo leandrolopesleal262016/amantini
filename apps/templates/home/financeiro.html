@@ -37,6 +37,7 @@
                                 <tr>
                                     <th scope="col">Titulo</th>
                                     <th scope="col">Responsavel</th>
+                                    <th scope="col">Valor do orcamento</th>
                                     <th scope="col">Concluida em</th>
                                     <th scope="col">Tempo na coluna</th>
                                     <th scope="col">Anexos</th>
@@ -60,6 +61,13 @@
                                     data-attachments='{{ tarefa.finance_attachments|tojson|forceescape }}'>
                                     <th scope="row">{{ tarefa.title }}</th>
                                     <td>{{ tarefa.assignee or '-' }}</td>
+                                    <td>
+                                        {% if tarefa.orcamento_valor is not none %}
+                                            R$ {{ '%.2f' | format(tarefa.orcamento_valor) | replace('.', ',') }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
                                     <td>{{ tarefa.data_conclusao_local_str or '' }}</td>
                                     <td>{{ tarefa.duration_display }}</td>
                                     <td>

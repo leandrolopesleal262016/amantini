@@ -540,6 +540,91 @@ def _collect_finance_attachments(completed_task):
     return attachments
 
 
+def _parse_currency_to_float(raw_value):
+    if raw_value is None:
+        return None
+
+    text = str(raw_value).strip()
+    if not text:
+        return None
+
+    text = re.sub(r'[^0-9,.\-]', '', text)
+    if not text:
+        return None
+
+    if ',' in text and '.' in text:
+        text = text.replace('.', '').replace(',', '.')
+    elif ',' in text:
+        text = text.replace(',', '.')
+
+    try:
+        return float(Decimal(text))
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def _resolve_completed_task_orcamento_valor(completed_task):
+    """Resolve o valor do orçamento para uma linha do Financeiro."""
+    if not completed_task:
+        return None
+
+    source_texts = (completed_task.observations, completed_task.description)
+
+    for source_text in source_texts:
+        if not source_text:
+            continue
+        compra_match = re.search(r'servico\s*/?\s*orcamento\s*#\s*(\d+)', source_text, flags=re.IGNORECASE)
+        if not compra_match:
+            continue
+        try:
+            compra_id = int(compra_match.group(1))
+        except (TypeError, ValueError):
+            continue
+
+        compra = Compra.query.filter_by(id=compra_id, usuario_id=completed_task.usuario_id).first()
+        if not compra:
+            compra = Compra.query.filter_by(id=compra_id).first()
+        if compra and compra.valor is not None:
+            try:
+                return float(compra.valor)
+            except (TypeError, ValueError):
+                continue
+
+    for source_text in source_texts:
+        if not source_text:
+            continue
+        match = re.search(r'valor\s*:\s*r?\$?\s*([0-9.,]+)', source_text, flags=re.IGNORECASE)
+        if match:
+            parsed = _parse_currency_to_float(match.group(1))
+            if parsed is not None:
+                return parsed
+
+    if completed_task.original_task_id:
+        workflows = CompraWorkflow.query.filter_by(pedido_id=completed_task.original_task_id).all()
+        candidates = [wf for wf in workflows if wf.compra and wf.compra.valor is not None]
+
+        if len(candidates) == 1:
+            try:
+                return float(candidates[0].compra.valor)
+            except (TypeError, ValueError):
+                pass
+
+        if len(candidates) > 1 and completed_task.data_conclusao:
+            prior = [wf for wf in candidates if wf.data_aprovacao and wf.data_aprovacao <= completed_task.data_conclusao]
+            basis = prior if prior else [wf for wf in candidates if wf.data_aprovacao]
+            if basis:
+                nearest = min(
+                    basis,
+                    key=lambda wf: abs((completed_task.data_conclusao - wf.data_aprovacao).total_seconds())
+                )
+                try:
+                    return float(nearest.compra.valor)
+                except (TypeError, ValueError):
+                    pass
+
+    return None
+
+
 @blueprint.route('/uploads/<path:filename>')
 @login_required
 def download_attachment(filename):
@@ -1543,86 +1628,95 @@ def api_criar_compra():
 @login_required
 def api_aprovar_compra(compra_id):
     """Encaminha um serviço (orçamento) para Pedidos de Compra na coluna Pendente."""
-    compra = Compra.query.filter_by(id=compra_id, usuario_id=current_user.id).first_or_404()
-    workflow = compra.workflow
-    if not workflow:
-        return jsonify({'success': False, 'message': 'Serviço sem obra vinculada.'}), 400
-    if workflow.pedido_id:
-        return jsonify({
-            'success': False,
-            'message': 'Este serviço já foi encaminhado ao Pedido de Compra.',
-            'pedido_id': workflow.pedido_id
-        }), 400
+    try:
+        compra = Compra.query.filter_by(id=compra_id, usuario_id=current_user.id).first_or_404()
+        workflow = compra.workflow
+        if not workflow:
+            return jsonify({'success': False, 'message': 'Serviço sem obra vinculada.'}), 400
+        if workflow.pedido_id:
+            return jsonify({
+                'success': False,
+                'message': 'Este serviço já foi encaminhado ao Pedido de Compra.',
+                'pedido_id': workflow.pedido_id
+            }), 400
 
-    obra = workflow.obra_rel or Obra.query.filter_by(id=workflow.obra_id).first()
-    if not obra:
-        return jsonify({'success': False, 'message': 'Obra vinculada não encontrada.'}), 404
-    if obra.usuario_id != current_user.id:
-        return jsonify({'success': False, 'message': 'Você não tem permissão para esta obra.'}), 403
+        obra = workflow.obra_rel or Obra.query.filter_by(id=workflow.obra_id).first()
+        if not obra:
+            return jsonify({'success': False, 'message': 'Obra vinculada não encontrada.'}), 404
 
-    responsavel = (current_user.first_name or current_user.username or 'Responsavel').strip()
-    data_necessidade = compra.data_orcamento or datetime.utcnow().date()
-    observacoes = (
-        f"Encaminhado automaticamente do servico/orcamento #{compra.id}. "
-        f"Fornecedor: {compra.fornecedor.nome if compra.fornecedor else '-'} | "
-        f"Valor: R$ {compra.valor:.2f}"
-    )
-    posicao_atual = (db.session.query(func.max(PedidoCompra.posicao))
-                     .filter_by(usuario_id=current_user.id, status='pendente')
-                     .scalar())
-    proxima_posicao = (posicao_atual + 1) if posicao_atual is not None else 0
+        responsavel = (current_user.first_name or current_user.username or 'Responsavel').strip()
+        data_necessidade = compra.data_orcamento or datetime.utcnow().date()
+        observacoes = (
+            f"Encaminhado automaticamente do servico/orcamento #{compra.id}. "
+            f"Fornecedor: {compra.fornecedor.nome if compra.fornecedor else '-'} | "
+            f"Valor: R$ {compra.valor:.2f}"
+        )
+        posicao_atual = (db.session.query(func.max(PedidoCompra.posicao))
+                         .filter_by(usuario_id=current_user.id, status='pendente')
+                         .scalar())
+        proxima_posicao = (posicao_atual + 1) if posicao_atual is not None else 0
 
-    pedido = PedidoCompra(
-        obra=obra.nome or 'Obra',
-        obra_id=obra.id,
-        obra_endereco=obra.endereco,
-        responsavel=responsavel,
-        prioridade='media',
-        data_necessidade=data_necessidade,
-        status='pendente',
-        observacoes=observacoes,
-        usuario_id=current_user.id,
-        posicao=proxima_posicao
-    )
-    db.session.add(pedido)
-    db.session.flush()
+        pedido = PedidoCompra(
+            obra=obra.nome or 'Obra',
+            obra_id=obra.id,
+            obra_endereco=obra.endereco,
+            responsavel=responsavel,
+            prioridade='media',
+            data_necessidade=data_necessidade,
+            status='pendente',
+            observacoes=observacoes,
+            usuario_id=current_user.id,
+            posicao=proxima_posicao
+        )
+        db.session.add(pedido)
+        db.session.flush()
 
-    item_nome = f"Servico - {compra.fornecedor.nome if compra.fornecedor else 'Fornecedor'}"
-    item = ItemPedido(
-        pedido_id=pedido.id,
-        codigo_item=f"SERV-{compra.id}",
-        nome_item=item_nome[:200],
-        observacao=f"Originado do servico/orcamento #{compra.id}",
-        quantidade=1.0,
-        unidade='un'
-    )
-    db.session.add(item)
-
-    compra_attachments = list(compra.attachments or [])
-    if compra_attachments:
-        for att in compra_attachments:
-            db.session.add(PedidoCompraAttachment(
-                pedido_id=pedido.id,
-                original_filename=att.original_filename,
-                stored_filename=att.stored_filename,
-                content_type=att.content_type,
-                file_size=att.file_size
-            ))
-    elif compra.attachment_path:
-        file_path = _resolve_existing_attachment_file(compra.attachment_path)
-        db.session.add(PedidoCompraAttachment(
+        item_nome = f"Servico - {compra.fornecedor.nome if compra.fornecedor else 'Fornecedor'}"
+        item = ItemPedido(
             pedido_id=pedido.id,
-            original_filename=Path(compra.attachment_path).name,
-            stored_filename=Path(compra.attachment_path).name,
-            content_type=None,
-            file_size=(os.path.getsize(file_path) if file_path else None)
-        ))
+            codigo_item=f"SERV-{compra.id}",
+            nome_item=item_nome[:200],
+            observacao=f"Originado do servico/orcamento #{compra.id}",
+            quantidade=1.0,
+            unidade='un'
+        )
+        db.session.add(item)
 
-    workflow.pedido_id = pedido.id
-    workflow.data_aprovacao = datetime.utcnow()
+        can_store_pedido_attachments = True
+        try:
+            can_store_pedido_attachments = inspect(db.engine).has_table('pedido_compra_attachments')
+        except Exception:
+            can_store_pedido_attachments = False
 
-    db.session.commit()
-    return jsonify({'success': True, 'pedido_id': pedido.id})
+        if can_store_pedido_attachments:
+            compra_attachments = list(compra.attachments or [])
+            if compra_attachments:
+                for att in compra_attachments:
+                    db.session.add(PedidoCompraAttachment(
+                        pedido_id=pedido.id,
+                        original_filename=att.original_filename,
+                        stored_filename=att.stored_filename,
+                        content_type=att.content_type,
+                        file_size=att.file_size
+                    ))
+            elif compra.attachment_path:
+                file_path = _resolve_existing_attachment_file(compra.attachment_path)
+                db.session.add(PedidoCompraAttachment(
+                    pedido_id=pedido.id,
+                    original_filename=Path(compra.attachment_path).name,
+                    stored_filename=Path(compra.attachment_path).name,
+                    content_type=None,
+                    file_size=(os.path.getsize(file_path) if file_path else None)
+                ))
+
+        workflow.pedido_id = pedido.id
+        workflow.data_aprovacao = datetime.utcnow()
+
+        db.session.commit()
+        return jsonify({'success': True, 'pedido_id': pedido.id})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Erro ao aprovar orçamento: {str(e)}'}), 500
 
 
 @blueprint.route('/pedidos-compra/kanban')
@@ -2065,6 +2159,7 @@ def financeiro():
         else:
             tarefa.duration_display = ''
 
+        tarefa.orcamento_valor = _resolve_completed_task_orcamento_valor(tarefa)
         tarefa.finance_attachments = _collect_finance_attachments(tarefa)
         tarefa.finance_attachments_zip_url = url_for('home_blueprint.download_financeiro_attachments_zip', completed_task_id=tarefa.id)
     return render_template('home/financeiro.html', tarefas=aguardando, segment='financeiro')

@@ -1,6 +1,6 @@
-{% extends "layouts/base.html" %}
+﻿{% extends "layouts/base.html" %}
 
-{% block title %} Serviços {% endblock %}
+{% block title %} ServiÃ§os {% endblock %}
 
 {% block stylesheets %}
 <style>
@@ -27,11 +27,11 @@
         <div class="header-body">
             <div class="row align-items-center">
                 <div class="col-lg-6 col-7">
-                    <h6 class="h2 d-inline-block mb-0 header-title">Serviços</h6>
+                    <h6 class="h2 d-inline-block mb-0 header-title">ServiÃ§os</h6>
                 </div>
                 <div class="col-lg-6 col-5 text-right">
                     <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#newCompraModal">
-                        <i class="ni ni-fat-add"></i> Novo Orçamento
+                        <i class="ni ni-fat-add"></i> Novo OrÃ§amento
                     </button>
                 </div>
             </div>
@@ -51,9 +51,9 @@
                                     <th scope="col">Fornecedor</th>
                                     <th scope="col">Obra</th>
                                     <th scope="col">Valor</th>
-                                    <th scope="col">Data do Orçamento</th>
+                                    <th scope="col">Data do OrÃ§amento</th>
                                     <th scope="col">Arquivos</th>
-                                    <th scope="col">Ação</th>
+                                    <th scope="col">AÃ§Ã£o</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -88,7 +88,7 @@
                                             <button type="button"
                                                     class="btn btn-sm btn-success"
                                                     onclick="openApproveModal({{ compra.id }})">
-                                                Aprovar orçamento
+                                                Aprovar orÃ§amento
                                             </button>
                                         {% endif %}
                                     </td>
@@ -96,7 +96,7 @@
                                 {% else %}
                                 <tr>
                                     <td colspan="6" class="text-center text-muted py-4">
-                                        Nenhum serviço cadastrado até o momento.
+                                        Nenhum serviÃ§o cadastrado atÃ© o momento.
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -112,7 +112,7 @@
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="newCompraModalLabel">Novo Orçamento</h5>
+                    <h5 class="modal-title" id="newCompraModalLabel">Novo OrÃ§amento</h5>
                     <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
@@ -128,7 +128,7 @@
                                         <option value="{{ obra.id }}">{{ obra.nome }}</option>
                                     {% endfor %}
                                 {% else %}
-                                    <option value="">Nenhuma obra disponível</option>
+                                    <option value="">Nenhuma obra disponÃ­vel</option>
                                 {% endif %}
                             </select>
                         </div>
@@ -151,7 +151,7 @@
                                     <input type="text" class="form-control" id="nf_nome_fantasia" required>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Razão Social</label>
+                                    <label class="form-label">RazÃ£o Social</label>
                                     <input type="text" class="form-control" id="nf_razao_social">
                                 </div>
                                 <div class="col-md-4">
@@ -187,7 +187,7 @@
                                     <input type="text" class="form-control" id="nf_logradouro">
                                 </div>
                                 <div class="col-md-2">
-                                    <label class="form-label">Número</label>
+                                    <label class="form-label">NÃºmero</label>
                                     <input type="text" class="form-control" id="nf_numero">
                                 </div>
                                 <div class="col-md-4">
@@ -203,18 +203,18 @@
                                     <input type="text" class="form-control" id="nf_estado" maxlength="2">
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label">Observações</label>
+                                    <label class="form-label">ObservaÃ§Ãµes</label>
                                     <textarea class="form-control" id="nf_obs" rows="2"></textarea>
                                 </div>
                             </div>
                         </div>
 
                         <div class="form-group">
-                            <label for="compra-valor">Valor do Orçamento</label>
+                            <label for="compra-valor">Valor do OrÃ§amento</label>
                             <input type="number" step="0.01" min="0.01" class="form-control" id="compra-valor" placeholder="0,00" required>
                         </div>
                         <div class="form-group">
-                            <label for="compra-data">Data do Orçamento</label>
+                            <label for="compra-data">Data do OrÃ§amento</label>
                             <input type="date" class="form-control" id="compra-data">
                         </div>
                         <div class="form-group">
@@ -242,14 +242,14 @@
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="approveCompraModalLabel">Confirmar Aprovação</h5>
+                    <h5 class="modal-title" id="approveCompraModalLabel">Confirmar AprovaÃ§Ã£o</h5>
                     <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <div class="modal-body">
                     <input type="hidden" id="approve-compra-id">
-                    <p class="mb-0">Ao confirmar, este orçamento será encaminhado ao Pedido de Compras e aparecerá na coluna <strong>Pendente</strong>.</p>
+                    <p class="mb-0">Ao confirmar, este orÃ§amento serÃ¡ encaminhado ao Pedido de Compras e aparecerÃ¡ na coluna <strong>Pendente</strong>.</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -379,7 +379,7 @@ async function createCompra() {
         return;
     }
     if (!valor) {
-        alert('Informe o valor do orçamento.');
+        alert('Informe o valor do orÃ§amento.');
         return;
     }
 
@@ -451,12 +451,12 @@ async function createCompra() {
         });
         const out2 = await respCompra.json();
         if (!respCompra.ok || !out2.success) {
-            alert(out2.message || 'Erro ao criar orçamento.');
+            alert(out2.message || 'Erro ao criar orÃ§amento.');
             return;
         }
         location.reload();
     } catch (e) {
-        alert('Erro ao criar serviço.');
+        alert('Erro ao criar serviÃ§o.');
     }
 }
 
@@ -471,17 +471,26 @@ async function confirmApproveCompra() {
 
     try {
         const resp = await fetch(`/api/compras/${compraId}/aprovar`, { method: 'POST' });
-        const out = await resp.json();
+        let out = {};
+        try {
+            out = await resp.json();
+        } catch (jsonErr) {
+            out = {};
+        }
+
         if (!resp.ok || !out.success) {
-            alert(out.message || 'Não foi possível encaminhar o orçamento.');
+            const fallbackMessage = `Nao foi possivel encaminhar o orcamento (HTTP ${resp.status}).`;
+            alert(out.message || fallbackMessage);
             return;
         }
+
         $('#approveCompraModal').modal('hide');
-        alert('Orçamento encaminhado ao Pedido de Compras na coluna Pendente.');
+        alert('Orcamento encaminhado ao Pedido de Compras na coluna Pendente.');
         window.location.href = '/pedidos-compra';
     } catch (e) {
-        alert('Erro ao aprovar orçamento.');
+        alert('Erro ao aprovar orcamento.');
     }
 }
 </script>
 {% endblock javascripts %}
+
