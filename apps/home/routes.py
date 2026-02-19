@@ -38,6 +38,7 @@ from apps.authentication.models import (
     PedidoCompraAttachment,
     ItemPedido,
     Task,
+    TaskAttachment,
     CompletedTask,
     CompletedTaskAttachment,
     Fornecedor,
@@ -1115,7 +1116,7 @@ def api_criar_pedido():
 def api_create_task():
     """Cria uma nova tarefa via requisição AJAX."""
     try:
-        data = request.get_json() or {}
+        data = request.form if request.form else (request.get_json() or {})
         title = data.get('title')
         if not title:
             return jsonify({'success': False, 'message': 'Título é obrigatório'}), 400
@@ -1144,8 +1145,51 @@ def api_create_task():
             usuario_id=current_user.id
         )
         db.session.add(nova_tarefa)
+        db.session.flush()
+
+        can_store_task_attachments = True
+        try:
+            can_store_task_attachments = inspect(db.engine).has_table('task_attachments')
+        except Exception:
+            can_store_task_attachments = False
+
+        uploaded_files = []
+        if request.files:
+            uploaded_files.extend(request.files.getlist('attachments'))
+            uploaded_files.extend(request.files.getlist('anexos'))
+            for key in ('attachment', 'anexo'):
+                single_file = request.files.get(key)
+                if single_file:
+                    uploaded_files.append(single_file)
+
+        first_attachment = None
+        if can_store_task_attachments:
+            for uploaded in uploaded_files:
+                if not uploaded or not uploaded.filename:
+                    continue
+
+                stored = _store_attachment_file(uploaded, f"task{nova_tarefa.id}")
+                if not stored:
+                    continue
+
+                if first_attachment is None:
+                    first_attachment = stored['stored_filename']
+
+                db.session.add(TaskAttachment(
+                    task_id=nova_tarefa.id,
+                    original_filename=stored['original_filename'],
+                    stored_filename=stored['stored_filename'],
+                    content_type=stored['content_type'],
+                    file_size=stored['file_size']
+                ))
+
         db.session.commit()
-        return jsonify({'success': True, 'task_id': nova_tarefa.id})
+        return jsonify({
+            'success': True,
+            'task_id': nova_tarefa.id,
+            'attachments_count': (len(nova_tarefa.attachments or []) if can_store_task_attachments else 0),
+            'attachment_path': first_attachment
+        })
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -1216,6 +1260,134 @@ def api_update_task(task_id):
     return jsonify({'success': True})
 
 
+@blueprint.route('/api/tasks/<int:task_id>/attachments', methods=['GET', 'POST', 'DELETE'])
+@login_required
+def api_task_attachments(task_id):
+    """Lista, adiciona e remove anexos de uma tarefa."""
+    task = Task.query.filter_by(id=task_id, usuario_id=current_user.id).first_or_404()
+
+    can_store_task_attachments = True
+    try:
+        can_store_task_attachments = inspect(db.engine).has_table('task_attachments')
+    except Exception:
+        can_store_task_attachments = False
+
+    if request.method == 'GET':
+        if not can_store_task_attachments:
+            return jsonify({'success': True, 'attachments': [], 'total_attachments': 0})
+
+        attachments = (TaskAttachment.query
+                       .filter_by(task_id=task.id)
+                       .order_by(TaskAttachment.data_criacao.asc())
+                       .all())
+        return jsonify({
+            'success': True,
+            'attachments': [_serialize_attachment_record(att) for att in attachments],
+            'total_attachments': len(attachments)
+        })
+
+    if not can_store_task_attachments:
+        return jsonify({
+            'success': False,
+            'message': 'Anexos de tarefa indisponiveis no ambiente atual.'
+        }), 400
+
+    if request.method == 'POST':
+        uploaded_files = []
+        if request.files:
+            uploaded_files.extend(request.files.getlist('attachments'))
+            uploaded_files.extend(request.files.getlist('anexos'))
+            for key in ('attachment', 'anexo'):
+                single_file = request.files.get(key)
+                if single_file:
+                    uploaded_files.append(single_file)
+
+        if not uploaded_files:
+            return jsonify({'success': False, 'message': 'Nenhum arquivo enviado.'}), 400
+
+        created = []
+        rejected = []
+        for uploaded in uploaded_files:
+            if not uploaded or not uploaded.filename:
+                continue
+
+            stored = _store_attachment_file(uploaded, f"task{task.id}")
+            if not stored:
+                rejected.append(uploaded.filename)
+                continue
+
+            record = TaskAttachment(
+                task_id=task.id,
+                original_filename=stored['original_filename'],
+                stored_filename=stored['stored_filename'],
+                content_type=stored['content_type'],
+                file_size=stored['file_size']
+            )
+            db.session.add(record)
+            created.append(record)
+
+        if not created:
+            return jsonify({
+                'success': False,
+                'message': 'Nenhum anexo valido foi enviado.',
+                'rejected': rejected
+            }), 400
+
+        db.session.commit()
+        attachments = (TaskAttachment.query
+                       .filter_by(task_id=task.id)
+                       .order_by(TaskAttachment.data_criacao.asc())
+                       .all())
+        return jsonify({
+            'success': True,
+            'attachments': [_serialize_attachment_record(att) for att in attachments],
+            'total_attachments': len(attachments),
+            'rejected': rejected
+        })
+
+    # DELETE
+    data = request.get_json(silent=True) or request.form or {}
+    attachment_id_raw = data.get('attachment_id')
+    stored_filename_raw = data.get('stored_filename')
+
+    attachment_id = None
+    if attachment_id_raw not in (None, ''):
+        try:
+            attachment_id = int(attachment_id_raw)
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'message': 'Anexo invalido.'}), 400
+
+    stored_filename = None
+    if stored_filename_raw:
+        stored_filename = Path(str(stored_filename_raw)).name
+        if stored_filename != str(stored_filename_raw):
+            return jsonify({'success': False, 'message': 'Arquivo invalido.'}), 400
+
+    record = None
+    if attachment_id and attachment_id > 0:
+        record = TaskAttachment.query.filter_by(id=attachment_id, task_id=task.id).first()
+    elif stored_filename:
+        record = TaskAttachment.query.filter_by(task_id=task.id, stored_filename=stored_filename).first()
+    else:
+        return jsonify({'success': False, 'message': 'Informe o anexo para remover.'}), 400
+
+    if not record:
+        return jsonify({'success': False, 'message': 'Anexo nao encontrado.'}), 404
+
+    db.session.delete(record)
+    db.session.commit()
+
+    attachments = (TaskAttachment.query
+                   .filter_by(task_id=task.id)
+                   .order_by(TaskAttachment.data_criacao.asc())
+                   .all())
+    return jsonify({
+        'success': True,
+        'attachments': [_serialize_attachment_record(att) for att in attachments],
+        'total_attachments': len(attachments)
+    })
+
+
 # Endpoint para concluir uma tarefa. Move a tarefa da tabela tasks para
 # completed_tasks, preservando seus dados originais e registrando o
 # horário de conclusão e a duração. Após completar, remove a
@@ -1266,21 +1438,31 @@ def api_complete_task(task_id):
         return jsonify({'success': False, 'message': 'Status inválido'}), 400
     task.status = status
 
+    can_use_task_attachments = True
+    try:
+        can_use_task_attachments = (
+            inspect(db.engine).has_table('task_attachments') and
+            inspect(db.engine).has_table('completed_task_attachments')
+        )
+    except Exception:
+        can_use_task_attachments = False
+
+    task_attachments = list(task.attachments or []) if can_use_task_attachments else []
+
     # Arquivo opcional
     attachment_file = request.files.get('attachment') if 'attachment' in request.files else None
     attachment_path = None
+    completion_attachment_record = None
 
     # Se o cliente enviar um anexo opcional, salva junto ao registro concluído.
     if attachment_file and attachment_file.filename:
-        # Salva arquivo
-        filename = secure_filename(attachment_file.filename)
-        timestamp = datetime.utcnow().strftime('%Y%m%d%H%M%S')
-        filename = f"{task.id}_{timestamp}_{filename}"
-        upload_dir = UPLOAD_FOLDER
-        os.makedirs(upload_dir, exist_ok=True)
-        file_full = os.path.join(upload_dir, filename)
-        attachment_file.save(file_full)
-        attachment_path = filename
+        stored = _store_attachment_file(attachment_file, f"task{task.id}")
+        if stored:
+            attachment_path = stored['stored_filename']
+            completion_attachment_record = stored
+
+    if not attachment_path and task_attachments:
+        attachment_path = task_attachments[0].stored_filename
 
     if status != 'Finalizado':
         return jsonify({'success': False, 'message': 'A tarefa precisa estar em Finalizado para concluir.'}), 400
@@ -1305,9 +1487,30 @@ def api_complete_task(task_id):
         attachment_path=attachment_path
     )
 
+    db.session.add(completed)
+    db.session.flush()
+
+    if can_use_task_attachments:
+        for att in task_attachments:
+            db.session.add(CompletedTaskAttachment(
+                completed_task_id=completed.id,
+                original_filename=att.original_filename,
+                stored_filename=att.stored_filename,
+                content_type=att.content_type,
+                file_size=att.file_size
+            ))
+
+        if completion_attachment_record:
+            db.session.add(CompletedTaskAttachment(
+                completed_task_id=completed.id,
+                original_filename=completion_attachment_record['original_filename'],
+                stored_filename=completion_attachment_record['stored_filename'],
+                content_type=completion_attachment_record['content_type'],
+                file_size=completion_attachment_record['file_size']
+            ))
+
     # Remove a tarefa original e salva a concluída
     db.session.delete(task)
-    db.session.add(completed)
     db.session.commit()
 
     return jsonify({'success': True, 'completed_id': completed.id})
@@ -1964,7 +2167,7 @@ def atualizar_status_pedido(pedido_id):
     return jsonify({'success': True})
 
 
-@blueprint.route('/api/pedidos-compra/<int:pedido_id>/attachments', methods=['GET', 'POST'])
+@blueprint.route('/api/pedidos-compra/<int:pedido_id>/attachments', methods=['GET', 'POST', 'DELETE'])
 @login_required
 def pedido_compra_attachments(pedido_id):
     """Lista e cadastra anexos de um pedido de compra."""
@@ -1981,38 +2184,90 @@ def pedido_compra_attachments(pedido_id):
             'total_attachments': len(attachments)
         })
 
-    uploaded_files = request.files.getlist('attachments')
-    if not uploaded_files:
-        return jsonify({'success': False, 'message': 'Nenhum arquivo enviado.'}), 400
+    if request.method == 'POST':
+        uploaded_files = []
+        if request.files:
+            uploaded_files.extend(request.files.getlist('attachments'))
+            uploaded_files.extend(request.files.getlist('anexos'))
+            for key in ('attachment', 'anexo'):
+                single_file = request.files.get(key)
+                if single_file:
+                    uploaded_files.append(single_file)
 
-    created = []
-    rejected = []
-    for uploaded in uploaded_files:
-        if not uploaded or not uploaded.filename:
-            continue
+        if not uploaded_files:
+            return jsonify({'success': False, 'message': 'Nenhum arquivo enviado.'}), 400
 
-        stored = _store_attachment_file(uploaded, f"pedido{pedido.id}")
-        if not stored:
-            rejected.append(uploaded.filename)
-            continue
+        created = []
+        rejected = []
+        for uploaded in uploaded_files:
+            if not uploaded or not uploaded.filename:
+                continue
 
-        record = PedidoCompraAttachment(
-            pedido_id=pedido.id,
-            original_filename=stored['original_filename'],
-            stored_filename=stored['stored_filename'],
-            content_type=stored['content_type'],
-            file_size=stored['file_size']
-        )
-        db.session.add(record)
-        created.append(record)
+            stored = _store_attachment_file(uploaded, f"pedido{pedido.id}")
+            if not stored:
+                rejected.append(uploaded.filename)
+                continue
 
-    if not created:
+            record = PedidoCompraAttachment(
+                pedido_id=pedido.id,
+                original_filename=stored['original_filename'],
+                stored_filename=stored['stored_filename'],
+                content_type=stored['content_type'],
+                file_size=stored['file_size']
+            )
+            db.session.add(record)
+            created.append(record)
+
+        if not created:
+            return jsonify({
+                'success': False,
+                'message': 'Nenhum anexo válido foi enviado.',
+                'rejected': rejected
+            }), 400
+
+        db.session.commit()
+
+        attachments = (PedidoCompraAttachment.query
+                       .filter_by(pedido_id=pedido.id)
+                       .order_by(PedidoCompraAttachment.data_criacao.asc())
+                       .all())
         return jsonify({
-            'success': False,
-            'message': 'Nenhum anexo válido foi enviado.',
+            'success': True,
+            'attachments': [_serialize_attachment_record(att) for att in attachments],
+            'total_attachments': len(attachments),
             'rejected': rejected
-        }), 400
+        })
 
+    # DELETE
+    data = request.get_json(silent=True) or request.form or {}
+    attachment_id_raw = data.get('attachment_id')
+    stored_filename_raw = data.get('stored_filename')
+
+    attachment_id = None
+    if attachment_id_raw not in (None, ''):
+        try:
+            attachment_id = int(attachment_id_raw)
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'message': 'Anexo inválido.'}), 400
+
+    stored_filename = None
+    if stored_filename_raw:
+        stored_filename = Path(str(stored_filename_raw)).name
+        if stored_filename != str(stored_filename_raw):
+            return jsonify({'success': False, 'message': 'Arquivo inválido.'}), 400
+
+    record = None
+    if attachment_id and attachment_id > 0:
+        record = PedidoCompraAttachment.query.filter_by(id=attachment_id, pedido_id=pedido.id).first()
+    elif stored_filename:
+        record = PedidoCompraAttachment.query.filter_by(pedido_id=pedido.id, stored_filename=stored_filename).first()
+    else:
+        return jsonify({'success': False, 'message': 'Informe o anexo para remover.'}), 400
+
+    if not record:
+        return jsonify({'success': False, 'message': 'Anexo não encontrado.'}), 404
+
+    db.session.delete(record)
     db.session.commit()
 
     attachments = (PedidoCompraAttachment.query
@@ -2022,8 +2277,7 @@ def pedido_compra_attachments(pedido_id):
     return jsonify({
         'success': True,
         'attachments': [_serialize_attachment_record(att) for att in attachments],
-        'total_attachments': len(attachments),
-        'rejected': rejected
+        'total_attachments': len(attachments)
     })
 
 

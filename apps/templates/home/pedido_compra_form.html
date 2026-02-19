@@ -3,13 +3,18 @@
 {% block title %} Pedido de Compra {% endblock %}
 
 <!-- Specific Page CSS goes HERE  -->
-<!-- Substitua a seÃ§Ã£o de estilos no seu arquivo pedido_compra_form.html por esta versÃ£o -->
+<!-- Substitua a seção de estilos no seu arquivo pedido_compra_form.html por esta versão -->
 
 {% block stylesheets %}
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <style>
     .header.bg-gradient-primary {
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+        padding-top: 1.5rem !important;
+        padding-bottom: 1.5rem !important;
+    }
+    .container-fluid.mt--7 {
+        margin-top: 0 !important;
     }
     .card.card-body.bg-light {
     background-color: #f0f0f0   !important;
@@ -33,9 +38,9 @@
         transform: translateY(-1px);
     }
 
-    /* === CORREÃ‡ÃƒO PARA ALINHAMENTO VERTICAL DOS TEXTOS === */
+    /* === CORREÇÃO PARA ALINHAMENTO VERTICAL DOS TEXTOS === */
     
-    /* CorreÃ§Ã£o para campos de formulÃ¡rio */
+    /* Correção para campos de formulário */
     .form-control {
         display: flex !important;
         align-items: center !important;
@@ -44,7 +49,7 @@
         padding: 0.375rem 0.75rem !important;
     }
 
-    /* CorreÃ§Ã£o especÃ­fica para selects */
+    /* Correção específica para selects */
     select.form-control {
         height: 38px !important;
         line-height: 38px !important;
@@ -53,7 +58,7 @@
         appearance: menulist !important;
     }
 
-    /* CorreÃ§Ã£o para inputs de texto e nÃºmero */
+    /* Correção para inputs de texto e número */
     input.form-control {
         height: 38px !important;
         line-height: 1.5 !important;
@@ -61,7 +66,7 @@
         vertical-align: middle !important;
     }
 
-    /* CorreÃ§Ã£o para textarea */
+    /* Correção para textarea */
     textarea.form-control {
         min-height: auto !important;
         display: block !important;
@@ -69,7 +74,7 @@
         padding: 0.375rem 0.75rem !important;
     }
 
-    /* CorreÃ§Ã£o especÃ­fica para Select2 */
+    /* Correção específica para Select2 */
     .select2-container--classic .select2-selection--single {
         height: 38px !important;
         border: 1px solid #cad1d7 !important;
@@ -90,13 +95,13 @@
         right: 1px !important;
     }
 
-    /* Garantir que os placeholders tambÃ©m fiquem centralizados */
+    /* Garantir que os placeholders também fiquem centralizados */
     .form-control::placeholder {
         vertical-align: middle !important;
         line-height: 1.5 !important;
     }
 
-    /* CorreÃ§Ã£o para campos de data */
+    /* Correção para campos de data */
     input[type="date"].form-control {
         height: 38px !important;
         line-height: 1.5 !important;
@@ -104,7 +109,7 @@
         align-items: center !important;
     }
 
-    /* CorreÃ§Ã£o para campos numÃ©ricos */
+    /* Correção para campos numéricos */
     input[type="number"].form-control {
         height: 38px !important;
         line-height: 1.5 !important;
@@ -119,7 +124,7 @@
         color: #525f7f !important;
     }
 
-    /* CorreÃ§Ã£o adicional para compatibilidade com Bootstrap */
+    /* Correção adicional para compatibilidade com Bootstrap */
     .form-group {
         margin-bottom: 1rem !important;
     }
@@ -129,38 +134,12 @@
         box-shadow: 0 0 0 0.2rem rgba(94, 114, 228, 0.25) !important;
     }
 
-    /* === FIM DA CORREÃ‡ÃƒO === */
+    /* === FIM DA CORREÇÃO === */
 
 </style>
 {% endblock stylesheets %}
 
 {% block content %}
-<div class="header bg-gradient-primary pb-8 pt-5 pt-md-8">
-    <div class="container-fluid">
-        <div class="header-body">
-            <div class="row">
-                <div class="col-xl-3 col-lg-6">
-                    <div class="card card-stats mb-4 mb-xl-0">
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col">
-                                    <h5 class="card-title text-uppercase text-muted mb-0">Total Pedidos</h5>
-                                    <span class="h2 font-weight-bold mb-0">42</span>
-                                </div>
-                                <div class="col-auto">
-                                    <div class="icon icon-shape bg-danger text-white rounded-circle shadow">
-                                        <i class="fas fa-chart-bar"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <div class="container-fluid mt--7">
     <div class="row">
         <div class="col">
@@ -179,18 +158,18 @@
                     <form id="pedidoCompraForm" method="POST" 
                           action="{% if pedido %}{{ url_for('home_blueprint.atualizar_pedido_compra', pedido_id=pedido.id) }}{% else %}{{ url_for('home_blueprint.criar_pedido_compra') }}{% endif %}">
                         
-                        <!-- InformaÃ§Ãµes BÃ¡sicas -->
+                        <!-- Informações Básicas -->
                         <div class="row mb-4">
                             <div class="col-12">
                                 <h4 class="section-title">
-                                    <i class="fas fa-info-circle me-2"></i>InformaÃ§Ãµes BÃ¡sicas
+                                    <i class="fas fa-info-circle me-2"></i>Informações Básicas
                                 </h4>
                             </div>
                             <div class="col-md-6">
                                 <div class="form-group">
-                                    <label class="form-control-label" for="responsavel">ResponsÃ¡vel</label>
+                                    <label class="form-control-label" for="responsavel">Responsável</label>
                                     <select class="form-control" id="responsavel" name="responsavel" data-toggle="select" data-size="7" required>
-                                        <option value="">Selecione o responsÃ¡vel...</option>
+                                        <option value="">Selecione o responsável...</option>
                                         <option value="Isabela" {% if pedido and pedido.responsavel == 'Isabela' %}selected{% endif %}>Isabela</option>
                                         <option value="Lucca" {% if pedido and pedido.responsavel == 'Lucca' %}selected{% endif %}>Lucca</option>
                                         <option value="Victor" {% if pedido and pedido.responsavel == 'Victor' %}selected{% endif %}>Victor</option>
@@ -210,7 +189,7 @@
                                             {% for obra in obras or [] %}
                                             <option value="{{ obra.id }}" data-endereco="{{ obra.endereco or '' }}" {% if pedido and pedido.obra_id == obra.id %}selected{% endif %}>{{ obra.nome }}</option>
                                             {% endfor %}
-                                            <option value="novo">Cadastrar nova obra…</option>
+                                            <option value="novo">Cadastrar nova obra...</option>
                                         </select>
                                         <button type="button" class="btn btn-outline-success ml-2" data-toggle="modal" data-target="#novaObraModal">
                                             <i class="fas fa-plus"></i>
@@ -254,7 +233,7 @@
                                     <label class="form-control-label" for="prioridade">Prioridade</label>
                                     <select class="form-control" id="prioridade" name="prioridade" data-toggle="select" required>
                                         <option value="baixa" {% if pedido and pedido.prioridade == 'baixa' %}selected{% endif %}>Baixa</option>
-                                        <option value="media" {% if pedido and pedido.prioridade == 'media' %}selected{% endif %}>MÃ©dia</option>
+                                        <option value="media" {% if pedido and pedido.prioridade == 'media' %}selected{% endif %}>Média</option>
                                         <option value="alta" {% if pedido and pedido.prioridade == 'alta' %}selected{% endif %}>Alta</option>
                                         <option value="urgente" {% if pedido and pedido.prioridade == 'urgente' %}selected{% endif %}>Urgente</option>
                                     </select>
@@ -269,7 +248,7 @@
                             </div>
                         </div>
 
-                        <!-- Status (sÃ³ aparece na ediÃ§Ã£o) -->
+                        <!-- Status (só aparece na edição) -->
                         {% if pedido %}
                         <div class="row mb-4">
                             <div class="col-md-6">
@@ -287,16 +266,7 @@
                         <input type="hidden" id="status" name="status" value="pendente">
                         {% endif %}
 
-                        <!-- SeÃ§Ã£o para adicionar o campo ObservaÃ§Ã£o -->
-<!-- Substitua esta parte no seu arquivo pedido_compra_form.html -->
-
-<!-- Adicionar Item -->
 <div class="row mb-4">
-    <div class="col-12">
-        <h4 class="section-title">
-            <i class="fas fa-plus-circle me-2"></i>Adicionar Item
-        </h4>
-    </div>
     <div class="col-12">
         <div class="card card-body bg-light">
             <div class="row">
@@ -317,7 +287,7 @@
                     <div class="form-group">
                         <label class="form-control-label">Observação</label>
                         <input type="text" class="form-control" id="novaObservacao" 
-                               placeholder="Ex: Cor branca, Marca especÃ­fica...">
+                               placeholder="Ex: Cor branca, Marca específica...">
                         <small class="text-muted">Cor, marca, especificação...</small>
                     </div>
                 </div>
@@ -335,13 +305,13 @@
                         <select class="form-control" id="novaUnidade">
                             <option value="un">Unidades (un)</option>
                             <option value="m">Metros (m)</option>
-                            <option value="m2">MetrosÂ² (mÂ²)</option>
-                            <option value="m3">MetrosÂ³ (mÂ³)</option>
+                            <option value="m2">Metros quadrados (m2)</option>
+                            <option value="m3">Metros cubicos (m3)</option>
                             <option value="kg">Quilos (kg)</option>
                             <option value="sc">Sacas (sc)</option>
-                            <option value="gl">GalÃµes (gl)</option>
+                            <option value="gl">Galões (gl)</option>
                             <option value="cx">Caixas (cx)</option>
-                            <option value="pc">PeÃ§as (pc)</option>
+                            <option value="pc">Peças (pc)</option>
                             <option value="lt">Litros (lt)</option>
                             <option value="ton">Toneladas (ton)</option>
                         </select>
@@ -373,23 +343,23 @@
                                 <div id="listaItens">
                                     <div class="text-center text-muted p-4">
                                         <i class="fas fa-box-open fa-3x mb-3"></i>
-                                        <p>Nenhum item adicionado ainda.<br>Use o formulÃ¡rio acima para adicionar itens.</p>
+                                        <p>Nenhum item adicionado ainda.<br>Use o formulário acima para adicionar itens.</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- ObservaÃ§Ãµes -->
+                        <!-- Observações -->
                         <div class="row mb-4">
                             <div class="col-12">
                                 <h4 class="section-title">
-                                    <i class="fas fa-comment-alt me-2"></i>ObservaÃ§Ãµes
+                                    <i class="fas fa-comment-alt me-2"></i>Observações
                                 </h4>
                             </div>
                             <div class="col-12">
                                 <div class="form-group">
                                     <textarea class="form-control" id="observacoes" name="observacoes" rows="4" 
-                                              placeholder="ObservaÃ§Ãµes adicionais...">{% if pedido %}{{ pedido.observacoes }}{% endif %}</textarea>
+                                              placeholder="Observações adicionais...">{% if pedido %}{{ pedido.observacoes }}{% endif %}</textarea>
                                 </div>
                             </div>
                         </div>
@@ -397,7 +367,7 @@
                         <!-- Campo hidden para itens -->
                         <input type="hidden" id="itensJson" name="itens" value="[]">
 
-                        <!-- BotÃµes -->
+                        <!-- Botões -->
                         <div class="row">
                             <div class="col-md-4">
                                 <button type="button" class="btn btn-warning btn-block" onclick="salvarRascunho()">
@@ -441,8 +411,8 @@
                         <input type="text" class="form-control" id="obra-nome" placeholder="Informe o nome da obra" required>
                     </div>
                     <div class="form-group mb-0">
-                        <label for="obra-endereco">EndereÃ§o</label>
-                        <textarea class="form-control" id="obra-endereco" rows="2" placeholder="Rua, nÃºmero, bairro, cidade..."></textarea>
+                        <label for="obra-endereco">Endereço</label>
+                        <textarea class="form-control" id="obra-endereco" rows="2" placeholder="Rua, número, bairro, cidade..."></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -489,7 +459,7 @@
         if (endereco) {
             obraEnderecoText.innerHTML = '<i class="fas fa-map-marker-alt mr-1 text-success"></i>' + endereco;
         } else {
-            obraEnderecoText.textContent = 'Informe ou cadastre uma obra para exibir o endereÃ§o.';
+            obraEnderecoText.textContent = 'Informe ou cadastre uma obra para exibir o endereço.';
         }
     }
 
@@ -562,7 +532,11 @@
 
     $(document).ready(function() {
         // Inicializar Select2
-        const select2Targets = ['#novoItem', '#novaUnidade', '#responsavel', '#prioridade', '#status'];
+        const select2Targets = ['#novoItem', '#novaUnidade', '#responsavel', '#prioridade'];
+        const statusSelect = document.querySelector('select#status');
+        if (statusSelect) {
+            select2Targets.push('#status');
+        }
         if (obrasEnabled) {
             select2Targets.push('#obra_id');
         }
@@ -663,7 +637,7 @@
         // Renderizar itens existentes
         renderizarItens();
 
-        // Definir data padrÃ£o se novo pedido
+        // Definir data padrão se novo pedido
         {% if not pedido %}
         document.getElementById('data_necessidade').valueAsDate = new Date();
         {% endif %}
@@ -922,7 +896,7 @@
         return data;
     }
 
-    // Submit do formulÃ¡rio
+    // Submit do formulário
     document.getElementById('pedidoCompraForm').addEventListener('submit', function(e) {
         if (itens.length === 0) {
             e.preventDefault();

@@ -336,10 +336,10 @@
                     <hr>
                     <div class="form-group">
                         <label for="pedido-attachments-input"><strong>Anexar arquivos</strong></label>
-                        <input type="file" class="form-control" id="pedido-attachments-input" multiple>
+                        <input type="file" class="d-none" id="pedido-attachments-input" multiple>
+                        <button type="button" class="btn btn-sm btn-info" id="btn-add-pedido-attachment">Anexar arquivo</button>
                         <small class="form-text text-muted">Você pode selecionar vários arquivos de uma vez.</small>
                     </div>
-                    <button type="button" class="btn btn-sm btn-info" id="uploadPedidoAttachmentBtn" onclick="uploadPedidoAttachments()">Enviar anexos</button>
                     <div class="mt-3">
                         <strong>Anexos do pedido:</strong>
                         <ul id="pedido-attachments-list" class="attachment-list mt-2"></ul>
@@ -419,6 +419,16 @@
                 sizeSpan.textContent = `(${size})`;
                 li.appendChild(sizeSpan);
             }
+
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'btn btn-sm btn-link text-danger ml-2 p-0';
+            removeBtn.textContent = 'Remover';
+            removeBtn.addEventListener('click', function() {
+                removePedidoAttachment(att.id, att.stored_filename);
+            });
+            li.appendChild(removeBtn);
+
             list.appendChild(li);
         });
     }
@@ -454,11 +464,10 @@
         if (!currentPedidoCard) return;
         const pedidoId = currentPedidoCard.getAttribute('data-id');
         const input = document.getElementById('pedido-attachments-input');
-        const btn = document.getElementById('uploadPedidoAttachmentBtn');
+        const btn = document.getElementById('btn-add-pedido-attachment');
         const files = input && input.files ? Array.from(input.files) : [];
 
         if (!pedidoId || files.length === 0) {
-            alert('Selecione ao menos um arquivo para anexar.');
             return;
         }
 
@@ -495,7 +504,58 @@
         });
     }
 
+    function removePedidoAttachment(attachmentId, storedFilename) {
+        if (!currentPedidoCard) return;
+        const pedidoId = currentPedidoCard.getAttribute('data-id');
+        if (!pedidoId) return;
+
+        if (!confirm('Remover este anexo do pedido?')) {
+            return;
+        }
+
+        fetch(`/api/pedidos-compra/${pedidoId}/attachments`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                attachment_id: attachmentId || null,
+                stored_filename: storedFilename || ''
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.message || 'Erro ao remover anexo');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            const attachments = data.attachments || [];
+            renderPedidoAttachments(attachments);
+            updateCurrentCardAttachmentCount(data.total_attachments || attachments.length);
+        })
+        .catch(err => {
+            console.error(err);
+            alert(err.message || 'Nao foi possivel remover o anexo.');
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
+        const addAttachmentBtn = document.getElementById('btn-add-pedido-attachment');
+        const attachmentInput = document.getElementById('pedido-attachments-input');
+
+        if (addAttachmentBtn && attachmentInput) {
+            addAttachmentBtn.addEventListener('click', function() {
+                attachmentInput.click();
+            });
+        }
+
+        if (attachmentInput) {
+            attachmentInput.addEventListener('change', function() {
+                uploadPedidoAttachments();
+            });
+        }
+
         document.querySelectorAll('.task-list').forEach(container => {
             new Sortable(container, {
                 group: 'pedidos',

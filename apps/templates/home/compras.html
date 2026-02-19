@@ -313,9 +313,9 @@
                     <hr>
                     <div class="form-group mb-0">
                         <label for="edit-compra-attachments-input"><strong>Anexos do Orcamento</strong></label>
-                        <input type="file" class="form-control" id="edit-compra-attachments-input" multiple>
-                        <small class="form-text text-muted">Voce pode anexar mais de um arquivo.</small>
-                        <button type="button" class="btn btn-sm btn-info mt-2" id="btn-upload-edit-compra-attachments" onclick="uploadCompraAttachments()">Adicionar arquivos</button>
+                        <input type="file" class="d-none" id="edit-compra-attachments-input" multiple>
+                        <button type="button" class="btn btn-sm btn-info mt-2" id="btn-upload-edit-compra-attachments">Anexar arquivo</button>
+                        <small class="form-text text-muted">Clique no botao para anexar mais arquivos em sequencia.</small>
                         <ul id="edit-compra-attachments-list" class="mt-2 mb-0 pl-3"></ul>
                     </div>
                 </div>
@@ -394,6 +394,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const saveButton = document.getElementById('btn-save-compra');
     const anexosInput = document.getElementById('compra-anexos');
     const addAnexoButton = document.getElementById('btn-add-compra-anexo');
+    const editAnexosInput = document.getElementById('edit-compra-attachments-input');
+    const addEditAnexoButton = document.getElementById('btn-upload-edit-compra-attachments');
     const newCompraModal = document.getElementById('newCompraModal');
     const servicoRows = document.querySelectorAll('.servico-row');
     const obrasEnabled = {{ 'true' if obras_enabled else 'false' }};
@@ -420,6 +422,18 @@ document.addEventListener('DOMContentLoaded', function() {
         anexosInput.addEventListener('change', function() {
             addSelectedCompraAttachments(this.files);
             this.value = '';
+        });
+    }
+
+    if (addEditAnexoButton && editAnexosInput) {
+        addEditAnexoButton.addEventListener('click', function() {
+            editAnexosInput.click();
+        });
+    }
+
+    if (editAnexosInput) {
+        editAnexosInput.addEventListener('change', function() {
+            uploadCompraAttachments();
         });
     }
 
@@ -544,7 +558,6 @@ async function uploadCompraAttachments() {
         return;
     }
     if (files.length === 0) {
-        alert('Selecione ao menos um arquivo.');
         return;
     }
 

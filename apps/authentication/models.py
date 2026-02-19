@@ -158,6 +158,7 @@ class Task(db.Model):
 
     # Data/hora de criação da tarefa. �stil para calcular o tempo de conclusão.
     data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+    attachments = db.relationship('TaskAttachment', backref='task', lazy=True, cascade='all, delete-orphan')
 
     def __repr__(self):
         return f'<Task {self.id} - {self.title}>'
@@ -198,6 +199,21 @@ class CompletedTask(db.Model):
     def __repr__(self):
         return f'<CompletedTask {self.id} - {self.title}>'
 
+
+
+class TaskAttachment(db.Model):
+    __tablename__ = 'task_attachments'
+
+    id = db.Column(db.Integer, primary_key=True)
+    task_id = db.Column(db.Integer, db.ForeignKey('tasks.id'), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=False)
+    stored_filename = db.Column(db.String(255), nullable=False)
+    content_type = db.Column(db.String(100), nullable=True)
+    file_size = db.Column(db.Integer, nullable=True)
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<TaskAttachment {self.id} - {self.original_filename}>'
 
 
 class CompletedTaskAttachment(db.Model):

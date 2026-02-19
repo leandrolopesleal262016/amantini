@@ -435,6 +435,13 @@
             <label for="taskObservations">Observações</label>
             <textarea class="form-control" id="taskObservations" rows="2"></textarea>
         </div>
+        <div class="form-group">
+            <label for="taskAttachmentsInput">Anexar Arquivos</label>
+            <input type="file" class="d-none" id="taskAttachmentsInput" multiple>
+            <button type="button" class="btn btn-sm btn-info" id="btnAddTaskAttachment">Anexar arquivo</button>
+            <small class="form-text text-muted d-block mt-2">Clique no botao para anexar mais arquivos em sequencia.</small>
+            <ul id="taskAttachmentsList" class="mt-2 mb-0 pl-3"></ul>
+        </div>
                     </form>
                 </div>
                 <div class="modal-footer">
@@ -490,6 +497,14 @@
                         <label>Status</label>
                         <p id="edit-status" class="form-control-plaintext"></p>
                     </div>
+                    <hr>
+                    <div class="form-group mb-0">
+                        <label for="editTaskAttachmentsInput"><strong>Anexos da Tarefa</strong></label>
+                        <input type="file" class="d-none" id="editTaskAttachmentsInput" multiple>
+                        <button type="button" class="btn btn-sm btn-info" id="btnAddEditTaskAttachment">Anexar arquivo</button>
+                        <small class="form-text text-muted d-block mt-2">Clique no botao para anexar mais arquivos em sequencia.</small>
+                        <ul id="editTaskAttachmentsList" class="mt-2 mb-0 pl-3"></ul>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -507,6 +522,208 @@
 {% block javascripts %}
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 <script>
+    const selectedTaskAttachments = [];
+    let currentEditingCard = null;
+
+    function renderTaskAttachmentsList() {
+        const list = document.getElementById('taskAttachmentsList');
+        if (!list) return;
+
+        list.innerHTML = '';
+        if (selectedTaskAttachments.length === 0) {
+            const item = document.createElement('li');
+            item.className = 'text-muted';
+            item.textContent = 'Nenhum arquivo selecionado.';
+            list.appendChild(item);
+            return;
+        }
+
+        selectedTaskAttachments.forEach((entry, index) => {
+            const item = document.createElement('li');
+            item.className = 'mb-1';
+
+            const fileName = document.createElement('span');
+            fileName.textContent = entry.file.name;
+            item.appendChild(fileName);
+
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'btn btn-sm btn-link text-danger ml-2 p-0';
+            removeBtn.textContent = 'Remover';
+            removeBtn.addEventListener('click', function() {
+                selectedTaskAttachments.splice(index, 1);
+                renderTaskAttachmentsList();
+            });
+            item.appendChild(removeBtn);
+
+            list.appendChild(item);
+        });
+    }
+
+    function addSelectedTaskAttachments(fileList) {
+        const files = Array.from(fileList || []);
+        files.forEach(file => {
+            const fileKey = `${file.name}__${file.size}__${file.lastModified}`;
+            const exists = selectedTaskAttachments.some(entry => entry.key === fileKey);
+            if (!exists) {
+                selectedTaskAttachments.push({ key: fileKey, file: file });
+            }
+        });
+        renderTaskAttachmentsList();
+    }
+
+    function clearSelectedTaskAttachments() {
+        selectedTaskAttachments.length = 0;
+        const input = document.getElementById('taskAttachmentsInput');
+        if (input) input.value = '';
+        renderTaskAttachmentsList();
+    }
+
+    function formatTaskFileSize(bytes) {
+        const value = Number(bytes || 0);
+        if (!value) return '';
+        if (value < 1024) return `${value} B`;
+        if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+        return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    function renderEditTaskAttachments(attachments) {
+        const list = document.getElementById('editTaskAttachmentsList');
+        if (!list) return;
+
+        list.innerHTML = '';
+        if (!attachments || attachments.length === 0) {
+            const item = document.createElement('li');
+            item.className = 'text-muted';
+            item.textContent = 'Nenhum anexo.';
+            list.appendChild(item);
+            return;
+        }
+
+        attachments.forEach(att => {
+            const item = document.createElement('li');
+            item.className = 'mb-1';
+
+            const link = document.createElement('a');
+            link.href = att.url;
+            link.target = '_blank';
+            link.textContent = att.name || 'Arquivo';
+            item.appendChild(link);
+
+            const size = formatTaskFileSize(att.file_size);
+            if (size) {
+                const sizeSpan = document.createElement('small');
+                sizeSpan.className = 'text-muted ml-2';
+                sizeSpan.textContent = `(${size})`;
+                item.appendChild(sizeSpan);
+            }
+
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'btn btn-sm btn-link text-danger ml-2 p-0';
+            removeBtn.textContent = 'Remover';
+            removeBtn.addEventListener('click', function() {
+                removeTaskAttachment(att.id, att.stored_filename);
+            });
+            item.appendChild(removeBtn);
+
+            list.appendChild(item);
+        });
+    }
+
+    function loadTaskAttachments(taskId) {
+        if (!taskId) return;
+
+        fetch(`/api/tasks/${taskId}/attachments`)
+        .then(response => {
+            if (!response.ok) throw new Error('Erro ao carregar anexos');
+            return response.json();
+        })
+        .then(data => {
+            renderEditTaskAttachments(data.attachments || []);
+        })
+        .catch(err => {
+            console.error(err);
+            renderEditTaskAttachments([]);
+        });
+    }
+
+    function uploadTaskAttachments() {
+        if (!currentEditingCard) return;
+        const taskId = currentEditingCard.getAttribute('data-id');
+        const input = document.getElementById('editTaskAttachmentsInput');
+        const btn = document.getElementById('btnAddEditTaskAttachment');
+        const files = input && input.files ? Array.from(input.files) : [];
+
+        if (!taskId || files.length === 0) {
+            return;
+        }
+
+        const formData = new FormData();
+        files.forEach(file => formData.append('attachments', file));
+
+        if (btn) btn.disabled = true;
+        fetch(`/api/tasks/${taskId}/attachments`, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.message || 'Erro ao enviar anexos');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            renderEditTaskAttachments(data.attachments || []);
+            if (input) input.value = '';
+            if (data.rejected && data.rejected.length > 0) {
+                alert(`Alguns arquivos foram recusados: ${data.rejected.join(', ')}`);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert(err.message || 'Nao foi possivel anexar os arquivos.');
+        })
+        .finally(() => {
+            if (btn) btn.disabled = false;
+        });
+    }
+
+    function removeTaskAttachment(attachmentId, storedFilename) {
+        if (!currentEditingCard) return;
+        const taskId = currentEditingCard.getAttribute('data-id');
+        if (!taskId) return;
+
+        if (!confirm('Remover este anexo da tarefa?')) {
+            return;
+        }
+
+        fetch(`/api/tasks/${taskId}/attachments`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                attachment_id: attachmentId || null,
+                stored_filename: storedFilename || ''
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.message || 'Erro ao remover anexo');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            renderEditTaskAttachments(data.attachments || []);
+        })
+        .catch(err => {
+            console.error(err);
+            alert(err.message || 'Nao foi possivel remover o anexo.');
+        });
+    }
     /**
      * Inicializa o quadro Kanban e define a lógica de arrastar/soltar
      * com persistência via API. Cada lista de tarefas (div.task-list)
@@ -517,6 +734,51 @@
      */
     document.addEventListener('DOMContentLoaded', function() {
         const containers = document.querySelectorAll('.task-list');
+        const addAttachmentBtn = document.getElementById('btnAddTaskAttachment');
+        const attachmentInput = document.getElementById('taskAttachmentsInput');
+        const newTaskModal = document.getElementById('newTaskModal');
+        const addEditAttachmentBtn = document.getElementById('btnAddEditTaskAttachment');
+        const editAttachmentInput = document.getElementById('editTaskAttachmentsInput');
+        const taskDetailsModal = document.getElementById('taskDetailsModal');
+
+        if (addAttachmentBtn && attachmentInput) {
+            addAttachmentBtn.addEventListener('click', function() {
+                attachmentInput.click();
+            });
+        }
+
+        if (attachmentInput) {
+            attachmentInput.addEventListener('change', function() {
+                addSelectedTaskAttachments(this.files);
+                this.value = '';
+            });
+        }
+
+        if (newTaskModal) {
+            newTaskModal.addEventListener('hidden.bs.modal', function() {
+                clearSelectedTaskAttachments();
+            });
+        }
+
+        if (addEditAttachmentBtn && editAttachmentInput) {
+            addEditAttachmentBtn.addEventListener('click', function() {
+                editAttachmentInput.click();
+            });
+        }
+
+        if (editAttachmentInput) {
+            editAttachmentInput.addEventListener('change', function() {
+                uploadTaskAttachments();
+            });
+        }
+
+        if (taskDetailsModal) {
+            taskDetailsModal.addEventListener('hidden.bs.modal', function() {
+                currentEditingCard = null;
+                if (editAttachmentInput) editAttachmentInput.value = '';
+                renderEditTaskAttachments([]);
+            });
+        }
 
         containers.forEach(container => {
             new Sortable(container, {
@@ -576,6 +838,7 @@
         });
         // Atualiza contadores após carregamento inicial
         updateCounters();
+        renderTaskAttachmentsList();
     });
 
     /**
@@ -620,23 +883,19 @@
             return;
         }
 
-        const taskData = {
-            title: title,
-            description: description,
-            observations: observations,
-            priority: priority,
-            assignee: assignee,
-            // A API espera dueDate no formato AAAA-MM-DD
-            dueDate: dueDate || null,
-            status: 'Pendente'
-        };
+        const formData = new FormData();
+        formData.append('title', title);
+        formData.append('description', description);
+        formData.append('observations', observations);
+        formData.append('priority', priority);
+        formData.append('assignee', assignee);
+        formData.append('dueDate', dueDate || '');
+        formData.append('status', 'Pendente');
+        selectedTaskAttachments.forEach(entry => formData.append('attachments', entry.file));
 
         fetch('/api/tasks', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(taskData)
+            body: formData
         })
         .then(response => {
             if (!response.ok) {
@@ -670,6 +929,7 @@
             pendenteList.insertAdjacentHTML('beforeend', newTaskHTML);
             updateCounters();
             document.getElementById('newTaskForm').reset();
+            clearSelectedTaskAttachments();
             $('#newTaskModal').modal('hide');
         })
         .catch(err => {
@@ -679,7 +939,6 @@
     }
 
     // Variável global que armazena o cartão atualmente sendo editado.
-    let currentEditingCard = null;
 
     // Evento delegado para abrir o modal de edição quando um cartão é clicado.
     document.addEventListener('click', function(e) {
@@ -709,6 +968,9 @@
             document.getElementById('edit-due-date').value = dueDateRaw;
             document.getElementById('edit-observations').value = observations;
             document.getElementById('edit-status').textContent = status;
+            const editAttachmentInput = document.getElementById('editTaskAttachmentsInput');
+            if (editAttachmentInput) editAttachmentInput.value = '';
+            loadTaskAttachments(taskId);
 
             // Exibe o modal de edição
             $('#taskDetailsModal').modal('show');
