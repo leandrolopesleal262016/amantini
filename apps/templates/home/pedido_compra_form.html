@@ -276,16 +276,15 @@
                                 <div class="form-group">
                                     <label class="form-control-label" for="status">Status</label>
                                     <select class="form-control" id="status" name="status" data-toggle="select">
-                                        <option value="solicitado" {% if pedido.status == 'solicitado' %}selected{% endif %}>Solicitado</option>
-                                        <option value="aprovado" {% if pedido.status == 'aprovado' %}selected{% endif %}>Aprovado</option>
-                                        <option value="em_compra" {% if pedido.status == 'em_compra' %}selected{% endif %}>Em Compra</option>
+                                        <option value="pendente" {% if pedido.status in ['pendente', 'solicitado'] %}selected{% endif %}>Pendente</option>
+                                        <option value="em_cotacao" {% if pedido.status in ['em_cotacao', 'aprovado', 'em_compra'] %}selected{% endif %}>Em cotacao</option>
                                         <option value="entregue" {% if pedido.status == 'entregue' %}selected{% endif %}>Entregue</option>
                                     </select>
                                 </div>
                             </div>
                         </div>
                         {% else %}
-                        <input type="hidden" id="status" name="status" value="solicitado">
+                        <input type="hidden" id="status" name="status" value="pendente">
                         {% endif %}
 
                         <!-- SeÃ§Ã£o para adicionar o campo ObservaÃ§Ã£o -->

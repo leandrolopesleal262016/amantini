@@ -65,7 +65,7 @@ class Obra(db.Model):
 
     def __repr__(self):
         return f'<Obra {self.id} - {self.nome}>'
-# ⭐ MODELOS DE PEDIDO DE COMPRA - VERSÃO CORRIGIDA
+# ⭐ MODELOS DE PEDIDO DE COMPRA - VERS�fO CORRIGIDA
 
 class PedidoCompra(db.Model):
     __tablename__ = 'pedidos_compra'
@@ -77,15 +77,16 @@ class PedidoCompra(db.Model):
     responsavel = db.Column(db.String(100), nullable=False)
     prioridade = db.Column(db.String(20), nullable=False)  # baixa, media, alta, urgente
     data_necessidade = db.Column(db.Date, nullable=False)
-    status = db.Column(db.String(20), default='solicitado')  # solicitado, aprovado, em_compra, entregue
+    status = db.Column(db.String(20), default='pendente')  # pendente, em_cotacao, entregue
     # Nova coluna para armazenar a posição do cartão dentro de cada coluna do Kanban
     posicao = db.Column(db.Integer, nullable=False, default=0)
     observacoes = db.Column(db.Text)
     data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
     usuario_id = db.Column(db.Integer, db.ForeignKey('Users.id'), nullable=False)
     
-    # ✅ RELACIONAMENTO CORRETO - SEM CONFLITO
+    # �o. RELACIONAMENTO CORRETO - SEM CONFLITO
     itens = db.relationship('ItemPedido', backref='pedido_compra', lazy=True, cascade='all, delete-orphan')
+    attachments = db.relationship('PedidoCompraAttachment', backref='pedido_compra', lazy=True, cascade='all, delete-orphan')
     
     def __repr__(self):
         return f'<PedidoCompra {self.id} - {self.obra}>'
@@ -97,12 +98,12 @@ class ItemPedido(db.Model):
     pedido_id = db.Column(db.Integer, db.ForeignKey('pedidos_compra.id'), nullable=False)
     codigo_item = db.Column(db.String(50), nullable=False)
     nome_item = db.Column(db.String(200), nullable=False)
-    observacao = db.Column(db.String(500), nullable=True)  # ⭐ CAMPO OBSERVAÇÃO
+    observacao = db.Column(db.String(500), nullable=True)  # ⭐ CAMPO OBSERVA�?�fO
     quantidade = db.Column(db.Float, nullable=False)
     unidade = db.Column(db.String(20), nullable=False)
     data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # ✅ NÃO DEFINIR RELACIONAMENTO AQUI - EVITA CONFLITO
+    # �o. N�fO DEFINIR RELACIONAMENTO AQUI - EVITA CONFLITO
     
     def __repr__(self):
         return f'<ItemPedido {self.nome_item} - {self.quantidade} {self.unidade}>'
@@ -117,6 +118,21 @@ class ItemPedido(db.Model):
             'unidade': self.unidade,
             'data_criacao': self.data_criacao.isoformat() if self.data_criacao else None
         }
+
+
+class PedidoCompraAttachment(db.Model):
+    __tablename__ = 'pedido_compra_attachments'
+
+    id = db.Column(db.Integer, primary_key=True)
+    pedido_id = db.Column(db.Integer, db.ForeignKey('pedidos_compra.id'), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=False)
+    stored_filename = db.Column(db.String(255), nullable=False)
+    content_type = db.Column(db.String(100), nullable=True)
+    file_size = db.Column(db.Integer, nullable=True)
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<PedidoCompraAttachment {self.id} - {self.original_filename}>'
 
 # ================================================================
 # MODELO DE TAREFA (TASK)
@@ -140,7 +156,7 @@ class Task(db.Model):
     posicao = db.Column(db.Integer, nullable=False, default=0)
     usuario_id = db.Column(db.Integer, db.ForeignKey('Users.id'), nullable=False)
 
-    # Data/hora de criação da tarefa. Útil para calcular o tempo de conclusão.
+    # Data/hora de criação da tarefa. �stil para calcular o tempo de conclusão.
     data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):
@@ -178,16 +194,27 @@ class CompletedTask(db.Model):
     # Caminho do arquivo anexo (quando existir) relativo à pasta de upload.
     # O campo é opcional e permite guardar arquivos vinculados à tarefa concluída.
     attachment_path = db.Column(db.String(255), nullable=True)
-
-    # Caminho do arquivo de nota/ boleto anexado (relativo ao diretório de mídia)
-    attachment_path = db.Column(db.String(255), nullable=True)
-
+    attachments = db.relationship('CompletedTaskAttachment', backref='completed_task', lazy=True, cascade='all, delete-orphan')
     def __repr__(self):
         return f'<CompletedTask {self.id} - {self.title}>'
 
 
+
+class CompletedTaskAttachment(db.Model):
+    __tablename__ = 'completed_task_attachments'
+
+    id = db.Column(db.Integer, primary_key=True)
+    completed_task_id = db.Column(db.Integer, db.ForeignKey('completed_tasks.id'), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=False)
+    stored_filename = db.Column(db.String(255), nullable=False)
+    content_type = db.Column(db.String(100), nullable=True)
+    file_size = db.Column(db.Integer, nullable=True)
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<CompletedTaskAttachment {self.id} - {self.original_filename}>'
 # ================================================================
-# MODELOS DE FORNECEDOR E COMPRA (ORÇAMENTO)
+# MODELOS DE FORNECEDOR E COMPRA (OR�?AMENTO)
 #
 # O modelo Fornecedor permite armazenar informações de fornecedores
 # (nome, email, telefone) associadas ao usuário atual. O modelo
@@ -285,3 +312,5 @@ def request_loader(request):
     username = request.form.get('username')
     user = Users.query.filter_by(username=username).first()
     return user if user else None
+
+

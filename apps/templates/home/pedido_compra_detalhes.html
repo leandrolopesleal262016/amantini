@@ -18,8 +18,10 @@
     }
     
     .status-solicitado { background-color: #ffeaa7; color: #2d3436; }
+    .status-pendente { background-color: #ffeaa7; color: #2d3436; }
     .status-aprovado { background-color: #74b9ff; color: white; }
     .status-em_compra { background-color: #fd79a8; color: white; }
+    .status-em_cotacao { background-color: #74b9ff; color: white; }
     .status-entregue { background-color: #00b894; color: white; }
     
     .priority-badge {
@@ -120,7 +122,7 @@
                     <a href="{{ url_for('home_blueprint.pedido_compra_pdf', pedido_id=pedido.id) }}" class="btn btn-sm btn-primary" target="_blank" rel="noopener">
                         <i class="fas fa-file-pdf"></i> PDF
                     </a>
-                    {% if pedido.status == 'solicitado' %}
+                    {% if pedido.status in ['pendente', 'solicitado'] %}
                     <a href="{{ url_for('home_blueprint.editar_pedido_compra', pedido_id=pedido.id) }}" 
                        class="btn btn-sm btn-warning">
                         <i class="fas fa-edit"></i> Editar
@@ -273,7 +275,7 @@
                 </div>
                 <div class="card-body">
                     <div class="list-group list-group-flush">
-                        {% if pedido.status == 'solicitado' %}
+                        {% if pedido.status in ['pendente', 'solicitado'] %}
                         <a href="{{ url_for('home_blueprint.editar_pedido_compra', pedido_id=pedido.id) }}" 
                            class="list-group-item list-group-item-action">
                             <div class="row align-items-center">
@@ -396,20 +398,11 @@
                             </div>
                         </div>
                         
-                        {% if pedido.status in ['aprovado', 'em_compra', 'entregue'] %}
+                        {% if pedido.status in ['em_cotacao', 'aprovado', 'em_compra', 'entregue'] %}
                         <div class="timeline-item">
                             <div class="timeline-content">
-                                <h6 class="mb-1">Pedido Aprovado</h6>
-                                <p class="text-sm text-muted mb-0">Status atualizado para aprovado</p>
-                            </div>
-                        </div>
-                        {% endif %}
-                        
-                        {% if pedido.status in ['em_compra', 'entregue'] %}
-                        <div class="timeline-item">
-                            <div class="timeline-content">
-                                <h6 class="mb-1">Em Processo de Compra</h6>
-                                <p class="text-sm text-muted mb-0">Itens sendo adquiridos</p>
+                                <h6 class="mb-1">Em cotacao</h6>
+                                <p class="text-sm text-muted mb-0">Pedido em fase de cotacao</p>
                             </div>
                         </div>
                         {% endif %}
@@ -444,9 +437,8 @@
                     <div class="form-group">
                         <label>Novo Status</label>
                         <select class="form-control" id="novoStatus">
-                            <option value="solicitado" {% if pedido.status == 'solicitado' %}selected{% endif %}>Solicitado</option>
-                            <option value="aprovado" {% if pedido.status == 'aprovado' %}selected{% endif %}>Aprovado</option>
-                            <option value="em_compra" {% if pedido.status == 'em_compra' %}selected{% endif %}>Em Compra</option>
+                            <option value="pendente" {% if pedido.status in ['pendente', 'solicitado'] %}selected{% endif %}>Pendente</option>
+                            <option value="em_cotacao" {% if pedido.status in ['em_cotacao', 'aprovado', 'em_compra'] %}selected{% endif %}>Em cotacao</option>
                             <option value="entregue" {% if pedido.status == 'entregue' %}selected{% endif %}>Entregue</option>
                         </select>
                     </div>

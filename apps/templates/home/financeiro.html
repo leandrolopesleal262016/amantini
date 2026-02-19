@@ -18,7 +18,7 @@
             <div class="row align-items-center">
                 <div class="col-8">
                     <h6 class="h2 text-white d-inline-block mb-0">Financeiro</h6>
-                    <p class="text-white mb-0">Tarefas aguardando nota ou boleto</p>
+                    <p class="text-white mb-0">Registros aguardando nota ou boleto</p>
                 </div>
             </div>
         </div>
@@ -39,7 +39,7 @@
                                     <th scope="col">Responsavel</th>
                                     <th scope="col">Concluida em</th>
                                     <th scope="col">Tempo na coluna</th>
-                                    <th scope="col">Anexo</th>
+                                    <th scope="col">Anexos</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -56,14 +56,15 @@
                                     data-data-criacao="{{ tarefa.data_criacao_local_str or '' }}"
                                     data-data-conclusao="{{ tarefa.data_conclusao_local_str or '' }}"
                                     data-duration="{{ tarefa.duration_display }}"
-                                    data-attachment-path="{{ tarefa.attachment_path if tarefa.attachment_path else '' }}">
+                                    data-download-all-url="{{ tarefa.finance_attachments_zip_url }}"
+                                    data-attachments='{{ tarefa.finance_attachments|tojson|forceescape }}'>
                                     <th scope="row">{{ tarefa.title }}</th>
                                     <td>{{ tarefa.assignee or '-' }}</td>
                                     <td>{{ tarefa.data_conclusao_local_str or '' }}</td>
                                     <td>{{ tarefa.duration_display }}</td>
                                     <td>
-                                        {% if tarefa.attachment_path %}
-                                        <a class="btn btn-sm btn-primary" href="{{ url_for('home_blueprint.download_attachment', filename=tarefa.attachment_path) }}" target="_blank">Download</a>
+                                        {% if tarefa.finance_attachments %}
+                                            <a class="btn btn-sm btn-primary" href="{{ tarefa.finance_attachments_zip_url }}" target="_blank" onclick="event.stopPropagation();">Arquivos</a>
                                         {% else %}
                                         <span class="text-muted">Nenhum</span>
                                         {% endif %}
@@ -76,7 +77,7 @@
                     {% else %}
                     <div class="text-center py-5">
                         <i class="ni ni-check-bold text-success display-4"></i>
-                        <p class="mt-3 mb-0">Nenhuma tarefa aguardando nota ou boleto no momento.</p>
+                        <p class="mt-3 mb-0">Nenhum registro aguardando nota ou boleto no momento.</p>
                     </div>
                     {% endif %}
                 </div>
@@ -104,7 +105,8 @@
                     <p><strong>Data de criacao:</strong> <span id="fin-data-criacao"></span></p>
                     <p><strong>Concluida em:</strong> <span id="fin-data-conclusao"></span></p>
                     <p><strong>Tempo na coluna:</strong> <span id="fin-duration"></span></p>
-                    <p><strong>Anexo:</strong> <span id="fin-attachment"></span></p>
+                    <p><strong>Anexos:</strong> <span id="fin-attachment"></span></p>
+                    <a id="fin-download-all-btn" class="btn btn-sm btn-primary mt-2" href="#" target="_blank" style="display:none;">Baixar todos os anexos</a>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
@@ -133,18 +135,37 @@ document.addEventListener('DOMContentLoaded', function() {
             const dataConclusao = this.getAttribute('data-data-conclusao');
             document.getElementById('fin-data-conclusao').textContent = dataConclusao || '';
             document.getElementById('fin-duration').textContent = this.getAttribute('data-duration') || '';
+            const downloadAllUrl = this.getAttribute('data-download-all-url') || '';
+            const downloadAllBtn = document.getElementById('fin-download-all-btn');
 
-            const attachmentPath = this.getAttribute('data-attachment-path') || '';
+            const attachmentsRaw = this.getAttribute('data-attachments') || '[]';
             const attachmentContainer = document.getElementById('fin-attachment');
             attachmentContainer.textContent = '';
-            if (attachmentPath) {
-                const link = document.createElement('a');
-                link.href = '/uploads/' + encodeURIComponent(attachmentPath);
-                link.textContent = 'Download';
-                link.target = '_blank';
-                attachmentContainer.appendChild(link);
-            } else {
+            let attachments = [];
+            try {
+                attachments = JSON.parse(attachmentsRaw);
+            } catch (e) {
+                attachments = [];
+            }
+            if (!attachments || attachments.length === 0) {
                 attachmentContainer.textContent = 'Nenhum';
+                if (downloadAllBtn) {
+                    downloadAllBtn.style.display = 'none';
+                    downloadAllBtn.href = '#';
+                }
+            } else {
+                attachments.forEach(function(att, index) {
+                    const link = document.createElement('a');
+                    link.href = att.url;
+                    link.textContent = att.name || ('Anexo ' + (index + 1));
+                    link.target = '_blank';
+                    link.className = 'd-block mb-1';
+                    attachmentContainer.appendChild(link);
+                });
+                if (downloadAllBtn && downloadAllUrl) {
+                    downloadAllBtn.href = downloadAllUrl;
+                    downloadAllBtn.style.display = 'inline-block';
+                }
             }
 
             $('#financeTaskModal').modal('show');

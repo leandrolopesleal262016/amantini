@@ -10,9 +10,11 @@ import io
 import json
 import os
 import re
+import zipfile
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
+from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import abort, flash, jsonify, redirect, render_template, request, send_file, send_from_directory, url_for
@@ -32,9 +34,11 @@ from apps.authentication.models import (
     Contact,
     Obra,
     PedidoCompra,
+    PedidoCompraAttachment,
     ItemPedido,
     Task,
     CompletedTask,
+    CompletedTaskAttachment,
     Fornecedor,
     Compra,
     Material,
@@ -106,20 +110,44 @@ def safe_obras_list(usuario_id=None):
         return [], False
 
 
+PEDIDO_STATUS_VALID = {'pendente', 'em_cotacao', 'entregue'}
+PEDIDO_STATUS_LEGACY_MAP = {
+    'solicitado': 'pendente',
+    'aprovado': 'em_cotacao',
+    'em_compra': 'em_cotacao',
+}
+
+
+def normalize_pedido_status(raw_status):
+    status = (raw_status or '').strip().lower()
+    if status in PEDIDO_STATUS_VALID:
+        return status
+    return PEDIDO_STATUS_LEGACY_MAP.get(status)
+
+
 def _build_obra_card(nome, endereco, pedidos):
     status_map = {
         'solicitado': 0,
         'aprovado': 0,
         'em_compra': 0,
-        'entregue': 0
+        'entregue': 0,
+        'pendente': 0,
+        'em_cotacao': 0,
     }
     total_itens = 0
 
     for pedido in pedidos:
         total_itens += len(pedido.itens or [])
-        status_key = (pedido.status or '').strip().lower()
-        if status_key in status_map:
-            status_map[status_key] += 1
+        normalized = normalize_pedido_status(pedido.status)
+        if normalized == 'pendente':
+            status_map['pendente'] += 1
+            status_map['solicitado'] += 1
+        elif normalized == 'em_cotacao':
+            status_map['em_cotacao'] += 1
+            status_map['aprovado'] += 1
+            status_map['em_compra'] += 1
+        elif normalized == 'entregue':
+            status_map['entregue'] += 1
 
     return {
         'nome': nome or 'Obra sem nome',
@@ -129,6 +157,24 @@ def _build_obra_card(nome, endereco, pedidos):
         'status': status_map,
         'pedidos_recentes': pedidos[:4],
     }
+
+
+def load_pedidos_for_kanban():
+    pedidos = (PedidoCompra.query
+               .order_by(PedidoCompra.posicao, PedidoCompra.id)
+               .all())
+
+    updated = False
+    for pedido in pedidos:
+        normalized = normalize_pedido_status(pedido.status) or 'pendente'
+        if pedido.status != normalized:
+            pedido.status = normalized
+            updated = True
+
+    if updated:
+        db.session.commit()
+
+    return pedidos
 
 
 def build_obras_overview_cards():
@@ -325,6 +371,66 @@ os.makedirs(AVATAR_FOLDER, exist_ok=True)
 COVER_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'media', 'covers'))
 os.makedirs(COVER_FOLDER, exist_ok=True)
 
+ALLOWED_GENERIC_ATTACHMENTS = {'pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx', 'txt'}
+
+
+def _is_allowed_attachment(filename):
+    if not filename or '.' not in filename:
+        return False
+    ext = filename.rsplit('.', 1)[1].lower()
+    return ext in ALLOWED_GENERIC_ATTACHMENTS
+
+
+def _store_attachment_file(uploaded_file, prefix):
+    original_filename = secure_filename(uploaded_file.filename or '')
+    if not original_filename:
+        return None
+
+    if not _is_allowed_attachment(original_filename):
+        return None
+
+    timestamp = datetime.utcnow().strftime('%Y%m%d%H%M%S%f')
+    stored_filename = f"{prefix}_{timestamp}_{uuid4().hex[:8]}_{original_filename}"
+    save_path = os.path.join(UPLOAD_FOLDER, stored_filename)
+    uploaded_file.save(save_path)
+
+    return {
+        'original_filename': original_filename,
+        'stored_filename': stored_filename,
+        'content_type': uploaded_file.content_type,
+        'file_size': os.path.getsize(save_path) if os.path.exists(save_path) else None,
+    }
+
+
+def _serialize_attachment_record(record):
+    return {
+        'id': record.id,
+        'name': record.original_filename,
+        'stored_filename': record.stored_filename,
+        'url': url_for('home_blueprint.download_attachment', filename=record.stored_filename),
+        'content_type': record.content_type or '',
+        'file_size': record.file_size or 0,
+    }
+
+
+def _collect_completed_task_attachments(completed_task):
+    attachments = []
+    for att in (completed_task.attachments or []):
+        attachments.append(_serialize_attachment_record(att))
+
+    # Compatibilidade com registros legados que usam somente attachment_path.
+    if completed_task.attachment_path and not any(a['stored_filename'] == completed_task.attachment_path for a in attachments):
+        attachments.append({
+            'id': 0,
+            'name': completed_task.attachment_path,
+            'stored_filename': completed_task.attachment_path,
+            'url': url_for('home_blueprint.download_attachment', filename=completed_task.attachment_path),
+            'content_type': '',
+            'file_size': 0,
+        })
+    return attachments
+
+
 @blueprint.route('/uploads/<path:filename>')
 @login_required
 def download_attachment(filename):
@@ -361,16 +467,52 @@ def download_cover(filename):
     """Serve imagem de capa de usuário."""
     return send_from_directory(COVER_FOLDER, filename, as_attachment=False)
 
+
+@blueprint.route('/financeiro/<int:completed_task_id>/anexos')
+@login_required
+def download_financeiro_attachments_zip(completed_task_id):
+    """Baixa todos os anexos de um registro do Financeiro em um único ZIP."""
+    completed = CompletedTask.query.filter_by(id=completed_task_id, usuario_id=current_user.id).first_or_404()
+    attachments = _collect_completed_task_attachments(completed)
+
+    if not attachments:
+        abort(404)
+
+    zip_buffer = io.BytesIO()
+    used_names = set()
+
+    with zipfile.ZipFile(zip_buffer, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
+        for att in attachments:
+            stored_filename = att.get('stored_filename')
+            if not stored_filename:
+                continue
+            file_path = os.path.join(UPLOAD_FOLDER, stored_filename)
+            if not os.path.isfile(file_path):
+                continue
+
+            original_name = secure_filename(att.get('name') or stored_filename) or stored_filename
+            base, ext = os.path.splitext(original_name)
+            arcname = original_name
+            idx = 1
+            while arcname in used_names:
+                arcname = f"{base}_{idx}{ext}"
+                idx += 1
+            used_names.add(arcname)
+            zipf.write(file_path, arcname=arcname)
+
+    if not used_names:
+        abort(404)
+
+    zip_buffer.seek(0)
+    filename = f"arquivos_financeiro_{completed_task_id}.zip"
+    return send_file(zip_buffer, as_attachment=True, download_name=filename, mimetype='application/zip')
+
 @blueprint.route('/pedidos-compra')
 @login_required
 def pedidos_compra():
-    """Lista todos os pedidos de compra"""
-    pedidos = (PedidoCompra.query
-               .order_by(PedidoCompra.data_criacao.desc())
-               .all())
-    for pedido in pedidos:
-        attach_local_datetime_fields(pedido, ['data_criacao'])
-    return render_template('home/pedidos_compra_lista.html', pedidos=pedidos, segment='pedidos')
+    """Exibe o quadro Kanban de pedidos de compra."""
+    pedidos = load_pedidos_for_kanban()
+    return render_template('home/pedidos_compra_kanban.html', pedidos=pedidos, segment='pedidos')
 
 @blueprint.route('/pedidos-compra/novo')
 @login_required
@@ -431,7 +573,7 @@ def criar_pedido_compra():
             responsavel=request.form.get('responsavel'),
             prioridade=request.form.get('prioridade'),
             data_necessidade=data_necessidade,
-            status=request.form.get('status', 'solicitado'),
+            status=normalize_pedido_status(request.form.get('status')) or 'pendente',
             observacoes=request.form.get('observacoes', ''),
             usuario_id=current_user.id
         )
@@ -628,7 +770,7 @@ def atualizar_pedido_compra(pedido_id):
         pedido.responsavel = request.form.get('responsavel')
         pedido.prioridade = request.form.get('prioridade')
         pedido.data_necessidade = datetime.strptime(request.form.get('data_necessidade'), '%Y-%m-%d').date()
-        pedido.status = request.form.get('status')
+        pedido.status = normalize_pedido_status(request.form.get('status')) or 'pendente'
         pedido.observacoes = request.form.get('observacoes', '')
 
         # Remover itens existentes
@@ -702,7 +844,7 @@ def api_criar_pedido():
             responsavel=dados['responsavel'],
             prioridade=dados['prioridade'],
             data_necessidade=data_necessidade,
-            status=dados.get('status', 'solicitado'),
+            status=normalize_pedido_status(dados.get('status')) or 'pendente',
             observacoes=dados.get('observacoes', ''),
             usuario_id=current_user.id
         )
@@ -1188,10 +1330,7 @@ def api_criar_compra():
 @login_required
 def pedidos_compra_kanban():
     """Exibe o quadro Kanban de pedidos de compra"""
-    # Obtém todos os pedidos do usuário atual ordenados por posição para cada status
-    pedidos = (PedidoCompra.query
-               .order_by(PedidoCompra.posicao)
-               .all())
+    pedidos = load_pedidos_for_kanban()
     return render_template('home/pedidos_compra_kanban.html', pedidos=pedidos, segment='pedidos')
 
 
@@ -1200,12 +1339,12 @@ def pedidos_compra_kanban():
 def atualizar_status_pedido(pedido_id):
     """Atualiza o status e a posição de um pedido de compra (Kanban)"""
     data = request.get_json() or {}
-    novo_status = data.get('status')
+    novo_status = normalize_pedido_status(data.get('status'))
     nova_posicao = data.get('posicao', 0)
     # Garantir que o pedido existe e pertence ao usuário atual
-    pedido = PedidoCompra.query.filter_by(id=pedido_id).first_or_404()
+    pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
     # Validar o status
-    if novo_status not in ['solicitado', 'aprovado', 'em_compra', 'entregue']:
+    if novo_status not in PEDIDO_STATUS_VALID:
         return jsonify({'success': False, 'message': 'Status inválido'}), 400
     # Atualizar status e posição
     pedido.status = novo_status
@@ -1215,6 +1354,121 @@ def atualizar_status_pedido(pedido_id):
         pedido.posicao = 0
     db.session.commit()
     return jsonify({'success': True})
+
+
+@blueprint.route('/api/pedidos-compra/<int:pedido_id>/attachments', methods=['GET', 'POST'])
+@login_required
+def pedido_compra_attachments(pedido_id):
+    """Lista e cadastra anexos de um pedido de compra."""
+    pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
+
+    if request.method == 'GET':
+        attachments = (PedidoCompraAttachment.query
+                       .filter_by(pedido_id=pedido.id)
+                       .order_by(PedidoCompraAttachment.data_criacao.asc())
+                       .all())
+        return jsonify({
+            'success': True,
+            'attachments': [_serialize_attachment_record(att) for att in attachments],
+            'total_attachments': len(attachments)
+        })
+
+    uploaded_files = request.files.getlist('attachments')
+    if not uploaded_files:
+        return jsonify({'success': False, 'message': 'Nenhum arquivo enviado.'}), 400
+
+    created = []
+    rejected = []
+    for uploaded in uploaded_files:
+        if not uploaded or not uploaded.filename:
+            continue
+
+        stored = _store_attachment_file(uploaded, f"pedido{pedido.id}")
+        if not stored:
+            rejected.append(uploaded.filename)
+            continue
+
+        record = PedidoCompraAttachment(
+            pedido_id=pedido.id,
+            original_filename=stored['original_filename'],
+            stored_filename=stored['stored_filename'],
+            content_type=stored['content_type'],
+            file_size=stored['file_size']
+        )
+        db.session.add(record)
+        created.append(record)
+
+    if not created:
+        return jsonify({
+            'success': False,
+            'message': 'Nenhum anexo válido foi enviado.',
+            'rejected': rejected
+        }), 400
+
+    db.session.commit()
+
+    attachments = (PedidoCompraAttachment.query
+                   .filter_by(pedido_id=pedido.id)
+                   .order_by(PedidoCompraAttachment.data_criacao.asc())
+                   .all())
+    return jsonify({
+        'success': True,
+        'attachments': [_serialize_attachment_record(att) for att in attachments],
+        'total_attachments': len(attachments),
+        'rejected': rejected
+    })
+
+
+@blueprint.route('/api/pedidos-compra/<int:pedido_id>/complete', methods=['POST'])
+@login_required
+def concluir_pedido_compra(pedido_id):
+    """Conclui um pedido entregue e move o registro para Financeiro."""
+    pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
+
+    status = normalize_pedido_status(pedido.status) or 'pendente'
+    if status != 'entregue':
+        return jsonify({'success': False, 'message': 'O pedido precisa estar em Entregue para concluir.'}), 400
+
+    completion_time = datetime.utcnow()
+    duration_seconds = int((completion_time - pedido.data_criacao).total_seconds()) if pedido.data_criacao else None
+    itens_count = len(pedido.itens or [])
+    pedido_attachments = list(pedido.attachments or [])
+    data_necessidade = pedido.data_necessidade.strftime('%d/%m/%Y') if pedido.data_necessidade else '-'
+    prioridade = (pedido.prioridade or '-').title()
+
+    completed = CompletedTask(
+        original_task_id=pedido.id,
+        title=f"Pedido #{pedido.id} - {pedido.obra or 'Obra sem nome'}",
+        description=f"Obra: {pedido.obra or '-'} | Itens: {itens_count} | Data necessidade: {data_necessidade}",
+        observations=pedido.observacoes,
+        priority=prioridade,
+        assignee=pedido.responsavel,
+        due_date=pedido.data_necessidade,
+        status='Aguardando Nota/Boleto',
+        data_criacao=pedido.data_criacao,
+        data_conclusao=completion_time,
+        duration_seconds=duration_seconds,
+        usuario_id=pedido.usuario_id,
+        attachment_path=(pedido_attachments[0].stored_filename if pedido_attachments else None)
+    )
+
+    db.session.add(completed)
+    db.session.flush()
+
+    for att in pedido_attachments:
+        completed_attachment = CompletedTaskAttachment(
+            completed_task_id=completed.id,
+            original_filename=att.original_filename,
+            stored_filename=att.stored_filename,
+            content_type=att.content_type,
+            file_size=att.file_size
+        )
+        db.session.add(completed_attachment)
+
+    db.session.delete(pedido)
+    db.session.commit()
+
+    return jsonify({'success': True, 'completed_id': completed.id})
 
 
 @blueprint.route('/index')
@@ -1474,9 +1728,9 @@ def delete_contact(id):
 @blueprint.route('/financeiro')
 @login_required
 def financeiro():
-    """Lista tarefas concluídas que aguardam nota ou boleto."""
+    """Lista registros concluídos que aguardam nota ou boleto."""
     aguardando = (CompletedTask.query
-                  .filter_by(status='Aguardando Nota/Boleto')
+                  .filter_by(status='Aguardando Nota/Boleto', usuario_id=current_user.id)
                   .order_by(CompletedTask.data_conclusao.desc())
                   .all())
     for tarefa in aguardando:
@@ -1488,6 +1742,9 @@ def financeiro():
             tarefa.duration_display = f"{duration_days} dia{'s' if duration_days != 1 else ''}"
         else:
             tarefa.duration_display = ''
+
+        tarefa.finance_attachments = _collect_completed_task_attachments(tarefa)
+        tarefa.finance_attachments_zip_url = url_for('home_blueprint.download_financeiro_attachments_zip', completed_task_id=tarefa.id)
     return render_template('home/financeiro.html', tarefas=aguardando, segment='financeiro')
 # Helper - Extract current page name from request
 def get_segment(request):
