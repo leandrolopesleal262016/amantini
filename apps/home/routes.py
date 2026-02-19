@@ -11,6 +11,7 @@ import json
 import os
 import re
 import zipfile
+from pathlib import Path
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
@@ -20,7 +21,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from flask import abort, flash, jsonify, redirect, render_template, request, send_file, send_from_directory, url_for
 from flask_login import current_user, login_required
 from jinja2 import TemplateNotFound
-from sqlalchemy import inspect
+from sqlalchemy import func, inspect
 from sqlalchemy.exc import OperationalError, ProgrammingError
 from werkzeug.utils import secure_filename
 from decouple import config
@@ -41,6 +42,8 @@ from apps.authentication.models import (
     CompletedTaskAttachment,
     Fornecedor,
     Compra,
+    CompraAttachment,
+    CompraWorkflow,
     Material,
     RecadoMural,
     Users,
@@ -101,9 +104,10 @@ def safe_obras_list(usuario_id=None):
     if not obras_feature_enabled():
         return [], False
     try:
-        obras = (Obra.query
-                 .order_by(Obra.nome)
-                 .all())
+        query = Obra.query
+        if usuario_id is not None:
+            query = query.filter_by(usuario_id=usuario_id)
+        obras = query.order_by(Obra.nome).all()
         return obras, True
     except (OperationalError, ProgrammingError):
         db.session.rollback()
@@ -364,6 +368,8 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 # Diretório separado para arquivos de orçamentos (compras)
 ORCAMENTO_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'media', 'orcamentos'))
 os.makedirs(ORCAMENTO_FOLDER, exist_ok=True)
+# Diretório legado de upload usado por versões antigas.
+LEGACY_UPLOAD_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static', 'uploads'))
 # Diretório para avatares de usuário
 AVATAR_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'media', 'avatars'))
 os.makedirs(AVATAR_FOLDER, exist_ok=True)
@@ -413,6 +419,72 @@ def _serialize_attachment_record(record):
     }
 
 
+def _resolve_existing_attachment_file(stored_filename):
+    """Resolve o caminho físico de um anexo em pastas atuais e legadas."""
+    if not stored_filename:
+        return None
+
+    safe_name = Path(stored_filename).name
+    if safe_name != stored_filename:
+        return None
+
+    for base_dir in (UPLOAD_FOLDER, ORCAMENTO_FOLDER, LEGACY_UPLOAD_FOLDER):
+        candidate = os.path.join(base_dir, safe_name)
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
+
+def _store_orcamento_file(uploaded_file, prefix):
+    original_filename = secure_filename(uploaded_file.filename or '')
+    if not original_filename:
+        return None
+
+    if not _is_allowed_attachment(original_filename):
+        return None
+
+    timestamp = datetime.utcnow().strftime('%Y%m%d%H%M%S%f')
+    stored_filename = f"{prefix}_{timestamp}_{uuid4().hex[:8]}_{original_filename}"
+    save_path = os.path.join(ORCAMENTO_FOLDER, stored_filename)
+    uploaded_file.save(save_path)
+
+    return {
+        'original_filename': original_filename,
+        'stored_filename': stored_filename,
+        'content_type': uploaded_file.content_type,
+        'file_size': os.path.getsize(save_path) if os.path.exists(save_path) else None,
+    }
+
+
+def _serialize_orcamento_attachment_record(record):
+    return {
+        'id': record.id,
+        'name': record.original_filename,
+        'stored_filename': record.stored_filename,
+        'url': url_for('home_blueprint.download_orcamento', filename=record.stored_filename),
+        'content_type': record.content_type or '',
+        'file_size': record.file_size or 0,
+    }
+
+
+def _collect_compra_attachments(compra):
+    attachments = []
+    for att in (compra.attachments or []):
+        attachments.append(_serialize_orcamento_attachment_record(att))
+
+    # Compatibilidade com registros antigos com apenas um anexo.
+    if compra.attachment_path and not any(a['stored_filename'] == compra.attachment_path for a in attachments):
+        attachments.append({
+            'id': 0,
+            'name': compra.attachment_path,
+            'stored_filename': compra.attachment_path,
+            'url': url_for('home_blueprint.download_orcamento', filename=compra.attachment_path),
+            'content_type': '',
+            'file_size': 0,
+        })
+    return attachments
+
+
 def _collect_completed_task_attachments(completed_task):
     attachments = []
     for att in (completed_task.attachments or []):
@@ -431,6 +503,43 @@ def _collect_completed_task_attachments(completed_task):
     return attachments
 
 
+def _collect_finance_attachments(completed_task):
+    """Coleta anexos do financeiro com fallback para o serviço de origem."""
+    attachments = _collect_completed_task_attachments(completed_task)
+    if attachments:
+        return attachments
+
+    if not completed_task or not completed_task.original_task_id:
+        return attachments
+
+    workflow = CompraWorkflow.query.filter_by(pedido_id=completed_task.original_task_id).first()
+    if not workflow or not workflow.compra:
+        return attachments
+
+    compra = workflow.compra
+    for att in (compra.attachments or []):
+        attachments.append({
+            'id': att.id,
+            'name': att.original_filename,
+            'stored_filename': att.stored_filename,
+            'url': url_for('home_blueprint.download_attachment', filename=att.stored_filename),
+            'content_type': att.content_type or '',
+            'file_size': att.file_size or 0,
+        })
+
+    if not attachments and compra.attachment_path:
+        attachments.append({
+            'id': 0,
+            'name': Path(compra.attachment_path).name,
+            'stored_filename': Path(compra.attachment_path).name,
+            'url': url_for('home_blueprint.download_attachment', filename=Path(compra.attachment_path).name),
+            'content_type': '',
+            'file_size': 0,
+        })
+
+    return attachments
+
+
 @blueprint.route('/uploads/<path:filename>')
 @login_required
 def download_attachment(filename):
@@ -439,12 +548,18 @@ def download_attachment(filename):
     Prioriza os anexos salvos em ``UPLOAD_FOLDER`` e oferece um fallback
     para o diretório legado ``apps/static/uploads`` usado anteriormente.
     """
-    if os.path.isfile(os.path.join(UPLOAD_FOLDER, filename)):
-        return send_from_directory(UPLOAD_FOLDER, filename, as_attachment=True)
+    safe_name = Path(filename).name
+    if safe_name != filename:
+        abort(404)
 
-    legacy_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static', 'uploads'))
-    if os.path.isfile(os.path.join(legacy_folder, filename)):
-        return send_from_directory(legacy_folder, filename, as_attachment=True)
+    if os.path.isfile(os.path.join(UPLOAD_FOLDER, safe_name)):
+        return send_from_directory(UPLOAD_FOLDER, safe_name, as_attachment=True)
+
+    if os.path.isfile(os.path.join(ORCAMENTO_FOLDER, safe_name)):
+        return send_from_directory(ORCAMENTO_FOLDER, safe_name, as_attachment=True)
+
+    if os.path.isfile(os.path.join(LEGACY_UPLOAD_FOLDER, safe_name)):
+        return send_from_directory(LEGACY_UPLOAD_FOLDER, safe_name, as_attachment=True)
 
     abort(404)
 
@@ -454,6 +569,44 @@ def download_attachment(filename):
 def download_orcamento(filename):
     """Serve um arquivo anexo de orçamento armazenado em ORCAMENTO_FOLDER."""
     return send_from_directory(ORCAMENTO_FOLDER, filename, as_attachment=True)
+
+
+@blueprint.route('/servicos/<int:compra_id>/arquivos')
+@login_required
+def download_servico_attachments_zip(compra_id):
+    """Baixa todos os arquivos anexos de um serviço (orçamento) em um único ZIP."""
+    compra = Compra.query.filter_by(id=compra_id, usuario_id=current_user.id).first_or_404()
+    attachments = _collect_compra_attachments(compra)
+    if not attachments:
+        abort(404)
+
+    zip_buffer = io.BytesIO()
+    used_names = set()
+    with zipfile.ZipFile(zip_buffer, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
+        for att in attachments:
+            stored_filename = att.get('stored_filename')
+            if not stored_filename:
+                continue
+            file_path = os.path.join(ORCAMENTO_FOLDER, stored_filename)
+            if not os.path.isfile(file_path):
+                continue
+
+            original_name = secure_filename(att.get('name') or stored_filename) or stored_filename
+            base, ext = os.path.splitext(original_name)
+            arcname = original_name
+            idx = 1
+            while arcname in used_names:
+                arcname = f"{base}_{idx}{ext}"
+                idx += 1
+            used_names.add(arcname)
+            zipf.write(file_path, arcname=arcname)
+
+    if not used_names:
+        abort(404)
+
+    zip_buffer.seek(0)
+    filename = f"arquivos_servico_{compra_id}.zip"
+    return send_file(zip_buffer, as_attachment=True, download_name=filename, mimetype='application/zip')
 
 @blueprint.route('/avatars/<path:filename>')
 @login_required
@@ -473,7 +626,7 @@ def download_cover(filename):
 def download_financeiro_attachments_zip(completed_task_id):
     """Baixa todos os anexos de um registro do Financeiro em um único ZIP."""
     completed = CompletedTask.query.filter_by(id=completed_task_id, usuario_id=current_user.id).first_or_404()
-    attachments = _collect_completed_task_attachments(completed)
+    attachments = _collect_finance_attachments(completed)
 
     if not attachments:
         abort(404)
@@ -486,8 +639,8 @@ def download_financeiro_attachments_zip(completed_task_id):
             stored_filename = att.get('stored_filename')
             if not stored_filename:
                 continue
-            file_path = os.path.join(UPLOAD_FOLDER, stored_filename)
-            if not os.path.isfile(file_path):
+            file_path = _resolve_existing_attachment_file(stored_filename)
+            if not file_path:
                 continue
 
             original_name = secure_filename(att.get('name') or stored_filename) or stored_filename
@@ -1109,12 +1262,13 @@ def tarefas_concluidas():
 # possui um valor e um arquivo de orçamento anexado.
 
 @blueprint.route('/compras')
+@blueprint.route('/servicos')
 @login_required
 def compras():
-    """Exibe a página de compras (orçamentos) com todos os registros disponíveis."""
+    """Exibe a página de serviços (orçamentos) com todos os registros disponíveis."""
     sync_csv_fornecedores(current_user.id)
-    # Recupera todas as compras do usuário atual
     compras = (Compra.query
+               .filter_by(usuario_id=current_user.id)
                .order_by(Compra.data_criacao.desc())
                .all())
     for compra in compras:
@@ -1122,11 +1276,26 @@ def compras():
         compra.data_criacao_local_date_str = (
             compra.data_criacao_local.strftime('%d/%m/%Y') if compra.data_criacao_local else ''
         )
-    # Recupera fornecedores do usuário atual para popular o formulário
+        compra.servico_attachments = _collect_compra_attachments(compra)
+        compra.servico_attachments_zip_url = url_for('home_blueprint.download_servico_attachments_zip', compra_id=compra.id)
+        workflow = compra.workflow
+        compra.obra = workflow.obra_rel if workflow and workflow.obra_rel else None
+        compra.pedido_id = workflow.pedido_id if workflow else None
+        compra.aprovado = bool(workflow and workflow.pedido_id)
+
     fornecedores = (Fornecedor.query
+                    .filter_by(usuario_id=current_user.id)
                     .order_by(Fornecedor.nome)
                     .all())
-    return render_template('home/compras.html', compras=compras, fornecedores=fornecedores, segment='compras')
+    obras, obras_enabled = safe_obras_list(current_user.id)
+    return render_template(
+        'home/compras.html',
+        compras=compras,
+        fornecedores=fornecedores,
+        obras=obras,
+        obras_enabled=obras_enabled,
+        segment='servicos'
+    )
 
 
 @blueprint.route('/api/obras', methods=['POST'])
@@ -1264,66 +1433,196 @@ def api_materiais():
 @blueprint.route('/api/compras', methods=['POST'])
 @login_required
 def api_criar_compra():
-    """Cria uma nova compra (orçamento) com anexo opcional de orçamento."""
-    # Permite envio via form-data ou JSON; form-data é usado quando há arquivo
+    """Cria um novo serviço (orçamento) com obra vinculada e múltiplos anexos."""
     data = request.form if request.form else (request.get_json() or {})
     fornecedor_id = data.get('fornecedor_id') or data.get('fornecedorId')
+    obra_id_raw = data.get('obra_id') or data.get('obraId')
     valor = data.get('valor') or data.get('value')
-    # Nome do novo fornecedor, se fornecido
     novo_fornecedor_nome = data.get('novo_fornecedor') or data.get('novoFornecedor')
-    # Data do orçamento (formato YYYY-MM-DD). Este campo é opcional e, quando
-    # presente, será convertido para um objeto date. O front‑end utiliza
-    # ``id="compra-data"`` para capturar essa informação.
     data_orcamento_str = data.get('data') or data.get('data_orcamento') or data.get('dataOrcamento')
-    # Validação do valor
+
+    if not obra_id_raw:
+        return jsonify({'success': False, 'message': 'Obra é obrigatória.'}), 400
+    try:
+        obra_id = int(obra_id_raw)
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'Obra inválida.'}), 400
+
+    obra = Obra.query.filter_by(id=obra_id, usuario_id=current_user.id).first()
+    if not obra:
+        return jsonify({'success': False, 'message': 'Obra não encontrada.'}), 404
+
     try:
         valor_float = float(valor)
         if valor_float <= 0:
             raise ValueError
     except (TypeError, ValueError):
         return jsonify({'success': False, 'message': 'Valor inválido para orçamento.'}), 400
-    # Cria fornecedor se necessário
+
     fornecedor = None
     if novo_fornecedor_nome:
         fornecedor = Fornecedor(nome=novo_fornecedor_nome.strip(), usuario_id=current_user.id)
         db.session.add(fornecedor)
-        db.session.flush()  # obtém id
+        db.session.flush()
         fornecedor_id = fornecedor.id
     else:
         if not fornecedor_id:
             return jsonify({'success': False, 'message': 'Fornecedor é obrigatório.'}), 400
-        fornecedor = Fornecedor.query.filter_by(id=int(fornecedor_id)).first()
+        try:
+            fornecedor_id = int(fornecedor_id)
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'message': 'Fornecedor inválido.'}), 400
+
+        fornecedor = Fornecedor.query.filter_by(id=fornecedor_id, usuario_id=current_user.id).first()
         if not fornecedor:
             return jsonify({'success': False, 'message': 'Fornecedor não encontrado.'}), 404
-    # Processa arquivo de anexo, se houver
-    attachment_file = request.files.get('anexo') if request.files else None
-    attachment_path = None
-    if attachment_file and attachment_file.filename:
-        filename = secure_filename(attachment_file.filename)
-        timestamp = datetime.utcnow().strftime('%Y%m%d%H%M%S')
-        filename = f"{current_user.id}_{timestamp}_{filename}"
-        save_path = os.path.join(ORCAMENTO_FOLDER, filename)
-        attachment_file.save(save_path)
-        attachment_path = filename
-    # Converte a data do orçamento, se fornecida
+
     data_orcamento = None
     if data_orcamento_str:
         try:
-            # espera formato YYYY-MM-DD
             data_orcamento = datetime.strptime(data_orcamento_str, '%Y-%m-%d').date()
         except ValueError:
             return jsonify({'success': False, 'message': 'Data do orçamento inválida.'}), 400
-    # Cria registro de compra
+
     compra = Compra(
-        fornecedor_id=int(fornecedor_id),
+        fornecedor_id=fornecedor_id,
         valor=valor_float,
-        attachment_path=attachment_path,
+        attachment_path=None,
         data_orcamento=data_orcamento,
         usuario_id=current_user.id
     )
     db.session.add(compra)
+    db.session.flush()
+
+    workflow = CompraWorkflow(
+        compra_id=compra.id,
+        obra_id=obra.id,
+        pedido_id=None
+    )
+    db.session.add(workflow)
+
+    uploaded_files = []
+    if request.files:
+        uploaded_files.extend(request.files.getlist('anexos'))
+        uploaded_files.extend(request.files.getlist('attachments'))
+
+        for key in ('anexo', 'attachment'):
+            single_file = request.files.get(key)
+            if single_file:
+                uploaded_files.append(single_file)
+
+    first_attachment = None
+    for uploaded in uploaded_files:
+        if not uploaded or not uploaded.filename:
+            continue
+
+        stored = _store_orcamento_file(uploaded, f"servico{compra.id}")
+        if not stored:
+            continue
+
+        if first_attachment is None:
+            first_attachment = stored['stored_filename']
+
+        att = CompraAttachment(
+            compra_id=compra.id,
+            original_filename=stored['original_filename'],
+            stored_filename=stored['stored_filename'],
+            content_type=stored['content_type'],
+            file_size=stored['file_size']
+        )
+        db.session.add(att)
+
+    if first_attachment:
+        compra.attachment_path = first_attachment
+
     db.session.commit()
     return jsonify({'success': True, 'compra_id': compra.id})
+
+
+@blueprint.route('/api/compras/<int:compra_id>/aprovar', methods=['POST'])
+@login_required
+def api_aprovar_compra(compra_id):
+    """Encaminha um serviço (orçamento) para Pedidos de Compra na coluna Pendente."""
+    compra = Compra.query.filter_by(id=compra_id, usuario_id=current_user.id).first_or_404()
+    workflow = compra.workflow
+    if not workflow:
+        return jsonify({'success': False, 'message': 'Serviço sem obra vinculada.'}), 400
+    if workflow.pedido_id:
+        return jsonify({
+            'success': False,
+            'message': 'Este serviço já foi encaminhado ao Pedido de Compra.',
+            'pedido_id': workflow.pedido_id
+        }), 400
+
+    obra = workflow.obra_rel or Obra.query.filter_by(id=workflow.obra_id).first()
+    if not obra:
+        return jsonify({'success': False, 'message': 'Obra vinculada não encontrada.'}), 404
+    if obra.usuario_id != current_user.id:
+        return jsonify({'success': False, 'message': 'Você não tem permissão para esta obra.'}), 403
+
+    responsavel = (current_user.first_name or current_user.username or 'Responsavel').strip()
+    data_necessidade = compra.data_orcamento or datetime.utcnow().date()
+    observacoes = (
+        f"Encaminhado automaticamente do servico/orcamento #{compra.id}. "
+        f"Fornecedor: {compra.fornecedor.nome if compra.fornecedor else '-'} | "
+        f"Valor: R$ {compra.valor:.2f}"
+    )
+    posicao_atual = (db.session.query(func.max(PedidoCompra.posicao))
+                     .filter_by(usuario_id=current_user.id, status='pendente')
+                     .scalar())
+    proxima_posicao = (posicao_atual + 1) if posicao_atual is not None else 0
+
+    pedido = PedidoCompra(
+        obra=obra.nome or 'Obra',
+        obra_id=obra.id,
+        obra_endereco=obra.endereco,
+        responsavel=responsavel,
+        prioridade='media',
+        data_necessidade=data_necessidade,
+        status='pendente',
+        observacoes=observacoes,
+        usuario_id=current_user.id,
+        posicao=proxima_posicao
+    )
+    db.session.add(pedido)
+    db.session.flush()
+
+    item_nome = f"Servico - {compra.fornecedor.nome if compra.fornecedor else 'Fornecedor'}"
+    item = ItemPedido(
+        pedido_id=pedido.id,
+        codigo_item=f"SERV-{compra.id}",
+        nome_item=item_nome[:200],
+        observacao=f"Originado do servico/orcamento #{compra.id}",
+        quantidade=1.0,
+        unidade='un'
+    )
+    db.session.add(item)
+
+    compra_attachments = list(compra.attachments or [])
+    if compra_attachments:
+        for att in compra_attachments:
+            db.session.add(PedidoCompraAttachment(
+                pedido_id=pedido.id,
+                original_filename=att.original_filename,
+                stored_filename=att.stored_filename,
+                content_type=att.content_type,
+                file_size=att.file_size
+            ))
+    elif compra.attachment_path:
+        file_path = _resolve_existing_attachment_file(compra.attachment_path)
+        db.session.add(PedidoCompraAttachment(
+            pedido_id=pedido.id,
+            original_filename=Path(compra.attachment_path).name,
+            stored_filename=Path(compra.attachment_path).name,
+            content_type=None,
+            file_size=(os.path.getsize(file_path) if file_path else None)
+        ))
+
+    workflow.pedido_id = pedido.id
+    workflow.data_aprovacao = datetime.utcnow()
+
+    db.session.commit()
+    return jsonify({'success': True, 'pedido_id': pedido.id})
 
 
 @blueprint.route('/pedidos-compra/kanban')
@@ -1433,6 +1732,25 @@ def concluir_pedido_compra(pedido_id):
     duration_seconds = int((completion_time - pedido.data_criacao).total_seconds()) if pedido.data_criacao else None
     itens_count = len(pedido.itens or [])
     pedido_attachments = list(pedido.attachments or [])
+    if not pedido_attachments:
+        workflow = CompraWorkflow.query.filter_by(pedido_id=pedido.id).first()
+        if workflow and workflow.compra:
+            pedido_attachments = list(workflow.compra.attachments or [])
+            if not pedido_attachments and workflow.compra.attachment_path:
+                fallback_name = Path(workflow.compra.attachment_path).name
+                fallback_path = _resolve_existing_attachment_file(fallback_name)
+                pedido_attachments = [{
+                    'original_filename': fallback_name,
+                    'stored_filename': fallback_name,
+                    'content_type': None,
+                    'file_size': (os.path.getsize(fallback_path) if fallback_path else None)
+                }]
+
+    def _att_field(att, field_name, default=None):
+        if isinstance(att, dict):
+            return att.get(field_name, default)
+        return getattr(att, field_name, default)
+
     data_necessidade = pedido.data_necessidade.strftime('%d/%m/%Y') if pedido.data_necessidade else '-'
     prioridade = (pedido.prioridade or '-').title()
 
@@ -1449,19 +1767,23 @@ def concluir_pedido_compra(pedido_id):
         data_conclusao=completion_time,
         duration_seconds=duration_seconds,
         usuario_id=pedido.usuario_id,
-        attachment_path=(pedido_attachments[0].stored_filename if pedido_attachments else None)
+        attachment_path=(_att_field(pedido_attachments[0], 'stored_filename') if pedido_attachments else None)
     )
 
     db.session.add(completed)
     db.session.flush()
 
     for att in pedido_attachments:
+        stored_filename = _att_field(att, 'stored_filename')
+        if not stored_filename:
+            continue
+        original_filename = _att_field(att, 'original_filename') or stored_filename
         completed_attachment = CompletedTaskAttachment(
             completed_task_id=completed.id,
-            original_filename=att.original_filename,
-            stored_filename=att.stored_filename,
-            content_type=att.content_type,
-            file_size=att.file_size
+            original_filename=original_filename,
+            stored_filename=stored_filename,
+            content_type=_att_field(att, 'content_type'),
+            file_size=_att_field(att, 'file_size')
         )
         db.session.add(completed_attachment)
 
@@ -1743,7 +2065,7 @@ def financeiro():
         else:
             tarefa.duration_display = ''
 
-        tarefa.finance_attachments = _collect_completed_task_attachments(tarefa)
+        tarefa.finance_attachments = _collect_finance_attachments(tarefa)
         tarefa.finance_attachments_zip_url = url_for('home_blueprint.download_financeiro_attachments_zip', completed_task_id=tarefa.id)
     return render_template('home/financeiro.html', tarefas=aguardando, segment='financeiro')
 # Helper - Extract current page name from request

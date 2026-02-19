@@ -1,10 +1,9 @@
 {% extends "layouts/base.html" %}
 
-{% block title %} Compras {% endblock %}
+{% block title %} Serviços {% endblock %}
 
 {% block stylesheets %}
 <style>
-    /* Adapta a aparência da página de compras para seguir o tema claro/verde. */
     .header.bg-gradient-primary {
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
         padding-top: 1.5rem !important;
@@ -23,17 +22,14 @@
 {% endblock stylesheets %}
 
 {% block content %}
-
-<!-- Header -->
 <div class="header bg-gradient-primary pb-8 pt-5 pt-md-8">
     <div class="container-fluid">
         <div class="header-body">
             <div class="row align-items-center">
                 <div class="col-lg-6 col-7">
-                    <h6 class="h2 d-inline-block mb-0 header-title">Compras</h6>
+                    <h6 class="h2 d-inline-block mb-0 header-title">Serviços</h6>
                 </div>
                 <div class="col-lg-6 col-5 text-right">
-                    <!-- Botão renomeado para "Novo Orçamento" seguindo a nomenclatura solicitada -->
                     <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#newCompraModal">
                         <i class="ni ni-fat-add"></i> Novo Orçamento
                     </button>
@@ -43,7 +39,6 @@
     </div>
 </div>
 
-<!-- Page content -->
 <div class="container-fluid mt--7">
     <div class="row">
         <div class="col">
@@ -54,19 +49,20 @@
                             <thead class="thead-light">
                                 <tr>
                                     <th scope="col">Fornecedor</th>
+                                    <th scope="col">Obra</th>
                                     <th scope="col">Valor</th>
-                                    <!-- Mostra a data do orçamento ou, em falta, a data de criação -->
                                     <th scope="col">Data do Orçamento</th>
-                                    <th scope="col">Anexo</th>
+                                    <th scope="col">Arquivos</th>
+                                    <th scope="col">Ação</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for compra in compras %}
                                 <tr>
-                                    <th scope="row">{{ compra.fornecedor.nome }}</th>
+                                    <th scope="row">{{ compra.fornecedor.nome_fantasia or compra.fornecedor.nome }}</th>
+                                    <td>{{ compra.obra.nome if compra.obra else '-' }}</td>
                                     <td>R$ {{ '%.2f' | format(compra.valor) }}</td>
                                     <td>
-                                        {# Exibe data_orcamento se existir, caso contrário data_criacao #}
                                         {% if compra.data_orcamento %}
                                             {{ compra.data_orcamento.strftime('%d/%m/%Y') }}
                                         {% else %}
@@ -74,11 +70,33 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {% if compra.attachment_path %}
-                                            <a href="/orcamentos/{{ compra.attachment_path }}" target="_blank">Download</a>
+                                        {% if compra.servico_attachments %}
+                                            <a href="{{ compra.servico_attachments_zip_url }}" class="btn btn-sm btn-primary" target="_blank">Arquivos</a>
                                         {% else %}
-                                            Nenhum
+                                            <span class="text-muted">Nenhum</span>
                                         {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if not compra.obra %}
+                                            <span class="badge badge-warning">Sem obra vinculada</span>
+                                        {% elif compra.aprovado %}
+                                            <span class="badge badge-success">Encaminhado</span>
+                                            {% if compra.pedido_id %}
+                                                <a href="{{ url_for('home_blueprint.ver_pedido_compra', pedido_id=compra.pedido_id) }}" class="btn btn-sm btn-link">Ver pedido</a>
+                                            {% endif %}
+                                        {% else %}
+                                            <button type="button"
+                                                    class="btn btn-sm btn-success"
+                                                    onclick="openApproveModal({{ compra.id }})">
+                                                Aprovar orçamento
+                                            </button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-4">
+                                        Nenhum serviço cadastrado até o momento.
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -89,12 +107,11 @@
             </div>
         </div>
     </div>
-    <!-- Modal Nova Compra -->
+
     <div class="modal fade" id="newCompraModal" tabindex="-1" role="dialog" aria-labelledby="newCompraModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <!-- Título atualizado para refletir a criação de um novo orçamento -->
                     <h5 class="modal-title" id="newCompraModalLabel">Novo Orçamento</h5>
                     <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
@@ -103,15 +120,30 @@
                 <div class="modal-body">
                     <form id="newCompraForm">
                         <div class="form-group">
+                            <label for="compra-obra">Obra</label>
+                            <select class="form-control" id="compra-obra" name="obra_id" required>
+                                {% if obras_enabled %}
+                                    <option value="">Selecione uma obra</option>
+                                    {% for obra in obras %}
+                                        <option value="{{ obra.id }}">{{ obra.nome }}</option>
+                                    {% endfor %}
+                                {% else %}
+                                    <option value="">Nenhuma obra disponível</option>
+                                {% endif %}
+                            </select>
+                        </div>
+
+                        <div class="form-group">
                             <label for="compra-fornecedor">Fornecedor</label>
-                            <select class="form-control" id="compra-fornecedor" name="fornecedor_id">
+                            <select class="form-control" id="compra-fornecedor" name="fornecedor_id" required>
+                                <option value="">Selecione um fornecedor</option>
                                 {% for fornecedor in fornecedores %}
                                     <option value="{{ fornecedor.id }}">{{ fornecedor.nome_fantasia or fornecedor.nome }}</option>
                                 {% endfor %}
-                                <option value="novo">Incluir novo fornecedor…</option>
+                                <option value="novo">Incluir novo fornecedor...</option>
                             </select>
                         </div>
-                        <!-- Formulário para adicionar um novo fornecedor -->
+
                         <div class="border rounded p-3" id="novo-fornecedor-group" style="display:none;">
                             <div class="row g-2">
                                 <div class="col-md-6">
@@ -176,24 +208,52 @@
                                 </div>
                             </div>
                         </div>
+
                         <div class="form-group">
                             <label for="compra-valor">Valor do Orçamento</label>
-                            <input type="number" step="0.01" class="form-control" id="compra-valor" placeholder="0,00">
+                            <input type="number" step="0.01" min="0.01" class="form-control" id="compra-valor" placeholder="0,00" required>
                         </div>
-                        <!-- Campo para selecionar a data do orçamento -->
                         <div class="form-group">
                             <label for="compra-data">Data do Orçamento</label>
                             <input type="date" class="form-control" id="compra-data">
                         </div>
                         <div class="form-group">
-                            <label for="compra-anexo">Anexar Orçamento (PDF/Imagem)</label>
-                            <input type="file" class="form-control" id="compra-anexo">
+                            <label for="compra-anexos">Anexar Arquivos</label>
+                            <input type="file" class="d-none" id="compra-anexos" name="anexos" multiple>
+                            <button type="button" class="btn btn-sm btn-info" id="btn-add-compra-anexo">
+                                Anexar arquivo
+                            </button>
+                            <small class="form-text text-muted d-block mt-2">
+                                Clique no botao para anexar mais arquivos em sequencia.
+                            </small>
+                            <ul id="compra-anexos-list" class="mt-2 mb-0 pl-3"></ul>
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-success" onclick="createCompra()">Salvar</button>
+                    <button type="button" class="btn btn-success" id="btn-save-compra" onclick="createCompra()">Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="approveCompraModal" tabindex="-1" role="dialog" aria-labelledby="approveCompraModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="approveCompraModalLabel">Confirmar Aprovação</h5>
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="approve-compra-id">
+                    <p class="mb-0">Ao confirmar, este orçamento será encaminhado ao Pedido de Compras e aparecerá na coluna <strong>Pendente</strong>.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-success" onclick="confirmApproveCompra()">Confirmar</button>
                 </div>
             </div>
         </div>
@@ -204,40 +264,142 @@
 
 {% block javascripts %}
 <script>
-// Mostra ou esconde o formulário de novo fornecedor conforme a seleção
+const selectedCompraAttachments = [];
+
+function renderCompraAttachmentsList() {
+    const list = document.getElementById('compra-anexos-list');
+    if (!list) return;
+
+    list.innerHTML = '';
+    if (selectedCompraAttachments.length === 0) {
+        const item = document.createElement('li');
+        item.className = 'text-muted';
+        item.textContent = 'Nenhum arquivo selecionado.';
+        list.appendChild(item);
+        return;
+    }
+
+    selectedCompraAttachments.forEach((entry, index) => {
+        const item = document.createElement('li');
+        item.className = 'mb-1';
+
+        const fileName = document.createElement('span');
+        fileName.textContent = entry.file.name;
+        item.appendChild(fileName);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn btn-sm btn-link text-danger ml-2 p-0';
+        removeBtn.textContent = 'Remover';
+        removeBtn.addEventListener('click', function() {
+            selectedCompraAttachments.splice(index, 1);
+            renderCompraAttachmentsList();
+        });
+        item.appendChild(removeBtn);
+
+        list.appendChild(item);
+    });
+}
+
+function addSelectedCompraAttachments(fileList) {
+    const files = Array.from(fileList || []);
+    files.forEach(file => {
+        const fileKey = `${file.name}__${file.size}__${file.lastModified}`;
+        const exists = selectedCompraAttachments.some(entry => entry.key === fileKey);
+        if (!exists) {
+            selectedCompraAttachments.push({ key: fileKey, file: file });
+        }
+    });
+    renderCompraAttachmentsList();
+}
+
+function clearSelectedCompraAttachments() {
+    selectedCompraAttachments.length = 0;
+    const input = document.getElementById('compra-anexos');
+    if (input) input.value = '';
+    renderCompraAttachmentsList();
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const fornecedorSelect = document.getElementById('compra-fornecedor');
     const novoFornecedorGroup = document.getElementById('novo-fornecedor-group');
-    fornecedorSelect.addEventListener('change', function() {
-        novoFornecedorGroup.style.display = (this.value === 'novo') ? 'block' : 'none';
-    });
-    novoFornecedorGroup.style.display = (fornecedorSelect.value === 'novo') ? 'block' : 'none';
+    const saveButton = document.getElementById('btn-save-compra');
+    const anexosInput = document.getElementById('compra-anexos');
+    const addAnexoButton = document.getElementById('btn-add-compra-anexo');
+    const newCompraModal = document.getElementById('newCompraModal');
+    const obrasEnabled = {{ 'true' if obras_enabled else 'false' }};
+
+    if (!obrasEnabled && saveButton) {
+        saveButton.disabled = true;
+        saveButton.title = 'Cadastre ao menos uma obra para criar servicos.';
+    }
+
+    if (fornecedorSelect && novoFornecedorGroup) {
+        fornecedorSelect.addEventListener('change', function() {
+            novoFornecedorGroup.style.display = (this.value === 'novo') ? 'block' : 'none';
+        });
+        novoFornecedorGroup.style.display = (fornecedorSelect.value === 'novo') ? 'block' : 'none';
+    }
+
+    if (addAnexoButton && anexosInput) {
+        addAnexoButton.addEventListener('click', function() {
+            anexosInput.click();
+        });
+    }
+
+    if (anexosInput) {
+        anexosInput.addEventListener('change', function() {
+            addSelectedCompraAttachments(this.files);
+            this.value = '';
+        });
+    }
+
+    if (newCompraModal) {
+        newCompraModal.addEventListener('hidden.bs.modal', function() {
+            clearSelectedCompraAttachments();
+        });
+    }
+
+    renderCompraAttachmentsList();
 });
 
 async function createCompra() {
+    const obraId = document.getElementById('compra-obra').value;
     const fornecedorSelect = document.getElementById('compra-fornecedor');
     let fornecedorId = fornecedorSelect.value;
     const valor = document.getElementById('compra-valor').value;
-    const anexoInput = document.getElementById('compra-anexo');
     const dataInput = document.getElementById('compra-data');
-    // Se for novo fornecedor, envia dados para a API de fornecedores
+
+    if (!obraId) {
+        alert('Selecione uma obra.');
+        return;
+    }
+    if (!fornecedorId) {
+        alert('Selecione um fornecedor.');
+        return;
+    }
+    if (!valor) {
+        alert('Informe o valor do orçamento.');
+        return;
+    }
+
     if (fornecedorId === 'novo') {
         const payload = {
             nome_fantasia: document.getElementById('nf_nome_fantasia').value.trim(),
-            razao_social:  document.getElementById('nf_razao_social').value.trim(),
-            cnpj:          document.getElementById('nf_cnpj').value.trim(),
-            ie:            document.getElementById('nf_ie').value.trim(),
-            im:            document.getElementById('nf_im').value.trim(),
-            email:         document.getElementById('nf_email').value.trim(),
-            telefone:      document.getElementById('nf_telefone').value.trim(),
-            celular:       document.getElementById('nf_celular').value.trim(),
-            cep:           document.getElementById('nf_cep').value.trim(),
-            logradouro:    document.getElementById('nf_logradouro').value.trim(),
-            numero:        document.getElementById('nf_numero').value.trim(),
-            bairro:        document.getElementById('nf_bairro').value.trim(),
-            cidade:        document.getElementById('nf_cidade').value.trim(),
-            estado:        document.getElementById('nf_estado').value.trim().toUpperCase(),
-            obs:           document.getElementById('nf_obs').value.trim()
+            razao_social: document.getElementById('nf_razao_social').value.trim(),
+            cnpj: document.getElementById('nf_cnpj').value.trim(),
+            ie: document.getElementById('nf_ie').value.trim(),
+            im: document.getElementById('nf_im').value.trim(),
+            email: document.getElementById('nf_email').value.trim(),
+            telefone: document.getElementById('nf_telefone').value.trim(),
+            celular: document.getElementById('nf_celular').value.trim(),
+            cep: document.getElementById('nf_cep').value.trim(),
+            logradouro: document.getElementById('nf_logradouro').value.trim(),
+            numero: document.getElementById('nf_numero').value.trim(),
+            bairro: document.getElementById('nf_bairro').value.trim(),
+            cidade: document.getElementById('nf_cidade').value.trim(),
+            estado: document.getElementById('nf_estado').value.trim().toUpperCase(),
+            obs: document.getElementById('nf_obs').value.trim()
         };
         if (!payload.nome_fantasia) {
             alert('Informe o Nome Fantasia do fornecedor.');
@@ -266,21 +428,22 @@ async function createCompra() {
             }
             document.getElementById('novo-fornecedor-group').style.display = 'none';
             document.querySelectorAll('#novo-fornecedor-group input, #novo-fornecedor-group textarea').forEach(el => el.value = '');
-        } catch(e) {
+        } catch (e) {
             alert('Erro ao criar fornecedor.');
             return;
         }
     }
+
     const formData = new FormData();
+    formData.append('obra_id', obraId);
     formData.append('fornecedor_id', fornecedorId);
     formData.append('valor', valor);
-    const dataValor = dataInput.value;
-    if (dataValor) {
-        formData.append('data', dataValor);
+    if (dataInput.value) {
+        formData.append('data', dataInput.value);
     }
-    if (anexoInput.files && anexoInput.files.length > 0) {
-        formData.append('anexo', anexoInput.files[0]);
-    }
+
+    selectedCompraAttachments.forEach(entry => formData.append('anexos', entry.file));
+
     try {
         const respCompra = await fetch('/api/compras', {
             method: 'POST',
@@ -292,10 +455,33 @@ async function createCompra() {
             return;
         }
         location.reload();
-    } catch(e) {
-        alert('Erro ao criar compra.');
+    } catch (e) {
+        alert('Erro ao criar serviço.');
+    }
+}
+
+function openApproveModal(compraId) {
+    document.getElementById('approve-compra-id').value = compraId;
+    $('#approveCompraModal').modal('show');
+}
+
+async function confirmApproveCompra() {
+    const compraId = document.getElementById('approve-compra-id').value;
+    if (!compraId) return;
+
+    try {
+        const resp = await fetch(`/api/compras/${compraId}/aprovar`, { method: 'POST' });
+        const out = await resp.json();
+        if (!resp.ok || !out.success) {
+            alert(out.message || 'Não foi possível encaminhar o orçamento.');
+            return;
+        }
+        $('#approveCompraModal').modal('hide');
+        alert('Orçamento encaminhado ao Pedido de Compras na coluna Pendente.');
+        window.location.href = '/pedidos-compra';
+    } catch (e) {
+        alert('Erro ao aprovar orçamento.');
     }
 }
 </script>
 {% endblock javascripts %}
-

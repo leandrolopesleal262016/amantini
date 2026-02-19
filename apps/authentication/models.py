@@ -269,9 +269,43 @@ class Compra(db.Model):
     data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
     # Usuário que criou a compra
     usuario_id = db.Column(db.Integer, db.ForeignKey('Users.id'), nullable=False)
+    attachments = db.relationship('CompraAttachment', backref='compra', lazy=True, cascade='all, delete-orphan')
+    workflow = db.relationship('CompraWorkflow', backref='compra', lazy=True, uselist=False, cascade='all, delete-orphan')
 
     def __repr__(self):
         return f'<Compra {self.id} - {self.valor}>'
+
+
+class CompraAttachment(db.Model):
+    __tablename__ = 'compra_attachments'
+
+    id = db.Column(db.Integer, primary_key=True)
+    compra_id = db.Column(db.Integer, db.ForeignKey('compras.id'), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=False)
+    stored_filename = db.Column(db.String(255), nullable=False)
+    content_type = db.Column(db.String(100), nullable=True)
+    file_size = db.Column(db.Integer, nullable=True)
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<CompraAttachment {self.id} - {self.original_filename}>'
+
+
+class CompraWorkflow(db.Model):
+    __tablename__ = 'compra_workflows'
+
+    id = db.Column(db.Integer, primary_key=True)
+    compra_id = db.Column(db.Integer, db.ForeignKey('compras.id'), nullable=False, unique=True)
+    obra_id = db.Column(db.Integer, db.ForeignKey('obras.id'), nullable=False)
+    pedido_id = db.Column(db.Integer, db.ForeignKey('pedidos_compra.id'), nullable=True)
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+    data_aprovacao = db.Column(db.DateTime, nullable=True)
+
+    obra_rel = db.relationship('Obra', lazy='joined')
+    pedido_rel = db.relationship('PedidoCompra', lazy='joined')
+
+    def __repr__(self):
+        return f'<CompraWorkflow compra={self.compra_id} obra={self.obra_id} pedido={self.pedido_id}>'
 
 
 class RecadoMural(db.Model):
