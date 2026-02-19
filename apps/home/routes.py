@@ -511,7 +511,7 @@ def _collect_completed_task_attachments(completed_task):
 
 
 def _list_completed_task_workflows(completed_task):
-    """Lista workflows relacionados ao pedido concluído no contexto do usuário dono do registro."""
+    """Lista workflows relacionados ao pedido concluído."""
     if not completed_task or not completed_task.original_task_id:
         # Fallback para registros que não guardam mais pedido_id no workflow.
         source_text = f"{completed_task.description or ''} {completed_task.observations or ''}"
@@ -528,10 +528,7 @@ def _list_completed_task_workflows(completed_task):
         try:
             return (CompraWorkflow.query
                     .join(Compra, Compra.id == CompraWorkflow.compra_id)
-                    .filter(
-                        CompraWorkflow.compra_id.in_(list(dict.fromkeys(compra_ids))),
-                        Compra.usuario_id == completed_task.usuario_id
-                    )
+                    .filter(CompraWorkflow.compra_id.in_(list(dict.fromkeys(compra_ids))))
                     .order_by(CompraWorkflow.data_aprovacao.desc(), CompraWorkflow.id.desc())
                     .all())
         except Exception:
@@ -544,10 +541,7 @@ def _list_completed_task_workflows(completed_task):
     try:
         workflows = (CompraWorkflow.query
                      .join(Compra, Compra.id == CompraWorkflow.compra_id)
-                     .filter(
-                         CompraWorkflow.pedido_id == completed_task.original_task_id,
-                         Compra.usuario_id == completed_task.usuario_id
-                     )
+                     .filter(CompraWorkflow.pedido_id == completed_task.original_task_id)
                      .order_by(CompraWorkflow.data_aprovacao.desc(), CompraWorkflow.id.desc())
                      .all())
 
@@ -563,10 +557,7 @@ def _list_completed_task_workflows(completed_task):
             if compra_ids:
                 workflows = (CompraWorkflow.query
                              .join(Compra, Compra.id == CompraWorkflow.compra_id)
-                             .filter(
-                                 CompraWorkflow.compra_id.in_(list(dict.fromkeys(compra_ids))),
-                                 Compra.usuario_id == completed_task.usuario_id
-                             )
+                             .filter(CompraWorkflow.compra_id.in_(list(dict.fromkeys(compra_ids))))
                              .order_by(CompraWorkflow.data_aprovacao.desc(), CompraWorkflow.id.desc())
                              .all())
 
@@ -602,7 +593,7 @@ def _resolve_completed_task_obra(completed_task):
     if workflow:
         obra = workflow.obra_rel
         if not obra and workflow.obra_id:
-            obra = Obra.query.filter_by(id=workflow.obra_id, usuario_id=completed_task.usuario_id).first()
+            obra = Obra.query.filter_by(id=workflow.obra_id).first()
 
         if obra:
             return {
@@ -695,7 +686,7 @@ def _resolve_completed_task_orcamento_valor(completed_task):
         except (TypeError, ValueError):
             continue
 
-        compra = Compra.query.filter_by(id=compra_id, usuario_id=completed_task.usuario_id).first()
+        compra = Compra.query.filter_by(id=compra_id).first()
         if compra and compra.valor is not None:
             try:
                 return float(compra.valor)
@@ -756,7 +747,7 @@ def download_orcamento(filename):
 @login_required
 def download_servico_attachments_zip(compra_id):
     """Baixa todos os arquivos anexos de um serviço (orçamento) em um único ZIP."""
-    compra = Compra.query.filter_by(id=compra_id, usuario_id=current_user.id).first_or_404()
+    compra = Compra.query.filter_by(id=compra_id).first_or_404()
     attachments = _collect_compra_attachments(compra)
     if not attachments:
         abort(404)
@@ -806,7 +797,7 @@ def download_cover(filename):
 @login_required
 def download_financeiro_attachments_zip(completed_task_id):
     """Baixa todos os anexos de um registro do Financeiro em um único ZIP."""
-    completed = CompletedTask.query.filter_by(id=completed_task_id, usuario_id=current_user.id).first_or_404()
+    completed = CompletedTask.query.filter_by(id=completed_task_id).first_or_404()
     attachments = _collect_finance_attachments(completed)
 
     if not attachments:
@@ -845,7 +836,7 @@ def download_financeiro_attachments_zip(completed_task_id):
 @login_required
 def pedidos_compra():
     """Exibe o quadro Kanban de pedidos de compra."""
-    pedidos = load_pedidos_for_kanban(current_user.id)
+    pedidos = load_pedidos_for_kanban()
     return render_template('home/pedidos_compra_kanban.html', pedidos=pedidos, segment='pedidos')
 
 @blueprint.route('/pedidos-compra/novo')
@@ -855,7 +846,7 @@ def novo_pedido_compra():
     materiais = (Material.query
                  .order_by(Material.nome)
                  .all())
-    obras, obras_enabled = safe_obras_list(current_user.id)
+    obras, obras_enabled = safe_obras_list()
     return render_template(
         'home/pedido_compra_form.html',
         obras=obras,
@@ -878,7 +869,7 @@ def criar_pedido_compra():
         except (TypeError, ValueError):
             raise ValueError('Obra selecionada é inválida.')
 
-        obra = Obra.query.filter_by(id=obra_id, usuario_id=current_user.id).first()
+        obra = Obra.query.filter_by(id=obra_id).first()
         if not obra:
             raise ValueError('Obra selecionada não encontrada.')
 
@@ -935,7 +926,7 @@ def criar_pedido_compra():
 @login_required
 def ver_pedido_compra(pedido_id):
     """Visualiza um pedido específico"""
-    pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
+    pedido = PedidoCompra.query.filter_by(id=pedido_id).first_or_404()
     attach_local_datetime_fields(pedido, ['data_criacao'])
     dias_decorridos = None
     if pedido.data_criacao_local:
@@ -951,7 +942,7 @@ def ver_pedido_compra(pedido_id):
 @login_required
 def pedido_compra_pdf(pedido_id):
     """Gera um PDF com os dados completos do pedido de compra."""
-    pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
+    pedido = PedidoCompra.query.filter_by(id=pedido_id).first_or_404()
     data_criacao_local = utc_naive_to_local(pedido.data_criacao)
     data_criacao_local_str = data_criacao_local.strftime('%d/%m/%Y %H:%M') if data_criacao_local else '-'
 
@@ -1030,12 +1021,12 @@ def editar_pedido_compra(pedido_id):
 
     """Edita um pedido de compra"""
 
-    pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
+    pedido = PedidoCompra.query.filter_by(id=pedido_id).first_or_404()
     materiais = (Material.query
                  .order_by(Material.nome)
                  .all())
 
-    obras, obras_enabled = safe_obras_list(current_user.id)
+    obras, obras_enabled = safe_obras_list()
 
     return render_template(
 
@@ -1066,7 +1057,7 @@ def editar_pedido_compra(pedido_id):
 def atualizar_pedido_compra(pedido_id):
     """Atualiza um pedido de compra"""
     try:
-        pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first_or_404()
+        pedido = PedidoCompra.query.filter_by(id=pedido_id).first_or_404()
         obra_id_raw = request.form.get('obra_id')
         if not obra_id_raw:
             raise ValueError('Selecione uma obra válida.')
@@ -1075,7 +1066,7 @@ def atualizar_pedido_compra(pedido_id):
         except (TypeError, ValueError):
             raise ValueError('Obra selecionada é inválida.')
 
-        obra = Obra.query.filter_by(id=obra_id, usuario_id=current_user.id).first()
+        obra = Obra.query.filter_by(id=obra_id).first()
         if not obra:
             raise ValueError('Obra selecionada não encontrada.')
 
@@ -1132,7 +1123,7 @@ def api_criar_pedido():
         except (TypeError, ValueError):
             raise ValueError('Obra selecionada é inválida.')
 
-        obra = Obra.query.filter_by(id=obra_id, usuario_id=current_user.id).first()
+        obra = Obra.query.filter_by(id=obra_id).first()
         if not obra:
             raise ValueError('Obra selecionada não encontrada.')
 
@@ -1634,7 +1625,6 @@ def compras():
     """Exibe a página de serviços (orçamentos) com todos os registros disponíveis."""
     sync_csv_fornecedores(current_user.id)
     compras = (Compra.query
-               .filter_by(usuario_id=current_user.id)
                .order_by(Compra.data_criacao.desc())
                .all())
     for compra in compras:
@@ -1650,10 +1640,9 @@ def compras():
         compra.aprovado = bool(workflow and workflow.pedido_id)
 
     fornecedores = (Fornecedor.query
-                    .filter_by(usuario_id=current_user.id)
                     .order_by(Fornecedor.nome)
                     .all())
-    obras, obras_enabled = safe_obras_list(current_user.id)
+    obras, obras_enabled = safe_obras_list()
     return render_template(
         'home/compras.html',
         compras=compras,
@@ -1679,7 +1668,6 @@ def api_criar_obra():
     endereco = endereco[:255] if endereco else None
 
     existente = (Obra.query
-                 .filter(Obra.usuario_id == current_user.id)
                  .filter(Obra.nome.ilike(nome))
                  .first())
     if existente:
@@ -1815,7 +1803,7 @@ def api_criar_compra():
     except (TypeError, ValueError):
         return jsonify({'success': False, 'message': 'Obra inválida.'}), 400
 
-    obra = Obra.query.filter_by(id=obra_id, usuario_id=current_user.id).first()
+    obra = Obra.query.filter_by(id=obra_id).first()
     if not obra:
         return jsonify({'success': False, 'message': 'Obra não encontrada.'}), 404
 
@@ -1840,7 +1828,7 @@ def api_criar_compra():
         except (TypeError, ValueError):
             return jsonify({'success': False, 'message': 'Fornecedor inválido.'}), 400
 
-        fornecedor = Fornecedor.query.filter_by(id=fornecedor_id, usuario_id=current_user.id).first()
+        fornecedor = Fornecedor.query.filter_by(id=fornecedor_id).first()
         if not fornecedor:
             return jsonify({'success': False, 'message': 'Fornecedor não encontrado.'}), 404
 
@@ -1910,7 +1898,7 @@ def api_criar_compra():
 @login_required
 def api_atualizar_compra(compra_id):
     """Atualiza os campos principais de um serviço/orçamento."""
-    compra = Compra.query.filter_by(id=compra_id, usuario_id=current_user.id).first_or_404()
+    compra = Compra.query.filter_by(id=compra_id).first_or_404()
     data = request.get_json(silent=True) or request.form or {}
 
     obra_id_raw = data.get('obra_id') or data.get('obraId')
@@ -1930,7 +1918,7 @@ def api_atualizar_compra(compra_id):
     except (TypeError, ValueError):
         return jsonify({'success': False, 'message': 'Obra invalida.'}), 400
 
-    obra = Obra.query.filter_by(id=obra_id, usuario_id=current_user.id).first()
+    obra = Obra.query.filter_by(id=obra_id).first()
     if not obra:
         return jsonify({'success': False, 'message': 'Obra nao encontrada.'}), 404
 
@@ -1939,7 +1927,7 @@ def api_atualizar_compra(compra_id):
     except (TypeError, ValueError):
         return jsonify({'success': False, 'message': 'Fornecedor invalido.'}), 400
 
-    fornecedor = Fornecedor.query.filter_by(id=fornecedor_id, usuario_id=current_user.id).first()
+    fornecedor = Fornecedor.query.filter_by(id=fornecedor_id).first()
     if not fornecedor:
         return jsonify({'success': False, 'message': 'Fornecedor nao encontrado.'}), 404
 
@@ -1969,7 +1957,7 @@ def api_atualizar_compra(compra_id):
     compra.data_orcamento = data_orcamento
 
     if workflow.pedido_id:
-        pedido = PedidoCompra.query.filter_by(id=workflow.pedido_id, usuario_id=current_user.id).first()
+        pedido = PedidoCompra.query.filter_by(id=workflow.pedido_id).first()
         if pedido:
             pedido.obra = obra.nome or pedido.obra
             pedido.obra_id = obra.id
@@ -2005,7 +1993,7 @@ def api_atualizar_compra(compra_id):
 @login_required
 def compra_attachments(compra_id):
     """Lista, adiciona e remove anexos de um serviço/orçamento."""
-    compra = Compra.query.filter_by(id=compra_id, usuario_id=current_user.id).first_or_404()
+    compra = Compra.query.filter_by(id=compra_id).first_or_404()
 
     if request.method == 'GET':
         attachments = _collect_compra_attachments(compra)
@@ -2126,7 +2114,7 @@ def compra_attachments(compra_id):
 def api_aprovar_compra(compra_id):
     """Encaminha um serviço (orçamento) para Pedidos de Compra na coluna Pendente."""
     try:
-        compra = Compra.query.filter_by(id=compra_id, usuario_id=current_user.id).first_or_404()
+        compra = Compra.query.filter_by(id=compra_id).first_or_404()
         workflow = compra.workflow
         if not workflow:
             return jsonify({'success': False, 'message': 'Serviço sem obra vinculada.'}), 400
@@ -2137,7 +2125,7 @@ def api_aprovar_compra(compra_id):
                 'pedido_id': workflow.pedido_id
             }), 400
 
-        obra = workflow.obra_rel or Obra.query.filter_by(id=workflow.obra_id, usuario_id=current_user.id).first()
+        obra = workflow.obra_rel or Obra.query.filter_by(id=workflow.obra_id).first()
         if not obra:
             return jsonify({'success': False, 'message': 'Obra vinculada não encontrada.'}), 404
 
@@ -2149,7 +2137,7 @@ def api_aprovar_compra(compra_id):
             f"Valor: R$ {compra.valor:.2f}"
         )
         posicao_atual = (db.session.query(func.max(PedidoCompra.posicao))
-                         .filter_by(usuario_id=current_user.id, status='pendente')
+                         .filter_by(status='pendente')
                          .scalar())
         proxima_posicao = (posicao_atual + 1) if posicao_atual is not None else 0
 
@@ -2220,7 +2208,7 @@ def api_aprovar_compra(compra_id):
 @login_required
 def pedidos_compra_kanban():
     """Exibe o quadro Kanban de pedidos de compra"""
-    pedidos = load_pedidos_for_kanban(current_user.id)
+    pedidos = load_pedidos_for_kanban()
     return render_template('home/pedidos_compra_kanban.html', pedidos=pedidos, segment='pedidos')
 
 
@@ -2231,8 +2219,8 @@ def atualizar_status_pedido(pedido_id):
     data = request.get_json() or {}
     novo_status = normalize_pedido_status(data.get('status'))
     nova_posicao = data.get('posicao', 0)
-    # Garantir que o pedido existe e pertence ao usuário atual
-    pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first()
+    # Garantir que o pedido existe
+    pedido = PedidoCompra.query.filter_by(id=pedido_id).first()
     if not pedido:
         return jsonify({'success': False, 'message': 'Pedido não encontrado.'}), 404
     # Validar o status
@@ -2252,7 +2240,7 @@ def atualizar_status_pedido(pedido_id):
 @login_required
 def pedido_compra_attachments(pedido_id):
     """Lista e cadastra anexos de um pedido de compra."""
-    pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first()
+    pedido = PedidoCompra.query.filter_by(id=pedido_id).first()
     if not pedido:
         return jsonify({'success': False, 'message': 'Pedido não encontrado.'}), 404
 
@@ -2369,7 +2357,7 @@ def pedido_compra_attachments(pedido_id):
 def concluir_pedido_compra(pedido_id):
     """Conclui um pedido entregue e move o registro para Financeiro."""
     try:
-        pedido = PedidoCompra.query.filter_by(id=pedido_id, usuario_id=current_user.id).first()
+        pedido = PedidoCompra.query.filter_by(id=pedido_id).first()
         if not pedido:
             return jsonify({'success': False, 'message': 'Pedido não encontrado.'}), 404
 
@@ -2377,7 +2365,7 @@ def concluir_pedido_compra(pedido_id):
         linked_compra_id = None
         for wf in linked_workflows:
             compra_ref = getattr(wf, 'compra', None)
-            if compra_ref and compra_ref.usuario_id == current_user.id:
+            if compra_ref:
                 linked_compra_id = compra_ref.id
                 break
 
@@ -2393,8 +2381,7 @@ def concluir_pedido_compra(pedido_id):
             workflow = (CompraWorkflow.query
                         .join(Compra, Compra.id == CompraWorkflow.compra_id)
                         .filter(
-                            CompraWorkflow.pedido_id == pedido.id,
-                            Compra.usuario_id == current_user.id
+                            CompraWorkflow.pedido_id == pedido.id
                         )
                         .first())
             if workflow and workflow.compra:
@@ -2484,7 +2471,7 @@ def index():
 @blueprint.route('/principal')
 @login_required
 def principal():
-    obra_cards, obras_enabled = build_obras_overview_cards(current_user.id)
+    obra_cards, obras_enabled = build_obras_overview_cards()
 
     total_pedidos = sum(card['total_pedidos'] for card in obra_cards)
     total_entregues = sum(card['status']['entregue'] for card in obra_cards)
@@ -2492,7 +2479,7 @@ def principal():
 
     compras_total = 0
     try:
-        compras_total = Compra.query.filter_by(usuario_id=current_user.id).count()
+        compras_total = Compra.query.count()
     except (OperationalError, ProgrammingError):
         db.session.rollback()
         compras_total = 0
@@ -2735,7 +2722,7 @@ def delete_contact(id):
 def financeiro():
     """Lista registros concluídos que aguardam nota ou boleto."""
     aguardando = (CompletedTask.query
-                  .filter_by(status='Aguardando Nota/Boleto', usuario_id=current_user.id)
+                  .filter_by(status='Aguardando Nota/Boleto')
                   .order_by(CompletedTask.data_conclusao.desc())
                   .all())
     for tarefa in aguardando:
