@@ -513,7 +513,29 @@ def _collect_completed_task_attachments(completed_task):
 def _list_completed_task_workflows(completed_task):
     """Lista workflows relacionados ao pedido concluído no contexto do usuário dono do registro."""
     if not completed_task or not completed_task.original_task_id:
-        return []
+        # Fallback para registros que não guardam mais pedido_id no workflow.
+        source_text = f"{completed_task.description or ''} {completed_task.observations or ''}"
+        compra_ids = []
+        for match in re.finditer(r'servico\s*/?\s*orcamento\s*#\s*(\d+)', source_text, flags=re.IGNORECASE):
+            try:
+                compra_ids.append(int(match.group(1)))
+            except (TypeError, ValueError):
+                continue
+
+        if not compra_ids:
+            return []
+
+        try:
+            return (CompraWorkflow.query
+                    .join(Compra, Compra.id == CompraWorkflow.compra_id)
+                    .filter(
+                        CompraWorkflow.compra_id.in_(list(dict.fromkeys(compra_ids))),
+                        Compra.usuario_id == completed_task.usuario_id
+                    )
+                    .order_by(CompraWorkflow.data_aprovacao.desc(), CompraWorkflow.id.desc())
+                    .all())
+        except Exception:
+            return []
 
     cached = getattr(completed_task, '_related_workflows_cache', None)
     if cached is not None:
@@ -528,6 +550,26 @@ def _list_completed_task_workflows(completed_task):
                      )
                      .order_by(CompraWorkflow.data_aprovacao.desc(), CompraWorkflow.id.desc())
                      .all())
+
+        if not workflows:
+            source_text = f"{completed_task.description or ''} {completed_task.observations or ''}"
+            compra_ids = []
+            for match in re.finditer(r'servico\s*/?\s*orcamento\s*#\s*(\d+)', source_text, flags=re.IGNORECASE):
+                try:
+                    compra_ids.append(int(match.group(1)))
+                except (TypeError, ValueError):
+                    continue
+
+            if compra_ids:
+                workflows = (CompraWorkflow.query
+                             .join(Compra, Compra.id == CompraWorkflow.compra_id)
+                             .filter(
+                                 CompraWorkflow.compra_id.in_(list(dict.fromkeys(compra_ids))),
+                                 Compra.usuario_id == completed_task.usuario_id
+                             )
+                             .order_by(CompraWorkflow.data_aprovacao.desc(), CompraWorkflow.id.desc())
+                             .all())
+
         setattr(completed_task, '_related_workflows_cache', workflows)
         return workflows
     except Exception:
@@ -2331,6 +2373,14 @@ def concluir_pedido_compra(pedido_id):
         if not pedido:
             return jsonify({'success': False, 'message': 'Pedido não encontrado.'}), 404
 
+        linked_workflows = CompraWorkflow.query.filter_by(pedido_id=pedido.id).all()
+        linked_compra_id = None
+        for wf in linked_workflows:
+            compra_ref = getattr(wf, 'compra', None)
+            if compra_ref and compra_ref.usuario_id == current_user.id:
+                linked_compra_id = compra_ref.id
+                break
+
         status = normalize_pedido_status(pedido.status) or 'pendente'
         if status != 'entregue':
             return jsonify({'success': False, 'message': 'O pedido precisa estar em Entregue para concluir.'}), 400
@@ -2367,11 +2417,22 @@ def concluir_pedido_compra(pedido_id):
         data_necessidade = pedido.data_necessidade.strftime('%d/%m/%Y') if pedido.data_necessidade else '-'
         prioridade = (pedido.prioridade or '-').title()
 
+        description_text = f"Obra: {pedido.obra or '-'} | Itens: {itens_count} | Data necessidade: {data_necessidade}"
+        observations_text = pedido.observacoes
+        if linked_compra_id:
+            compra_tag = f"Servico/Orcamento #{linked_compra_id}"
+            if compra_tag.lower() not in (description_text or '').lower():
+                description_text = f"{description_text} | {compra_tag}"
+            if not observations_text:
+                observations_text = compra_tag
+            elif compra_tag.lower() not in observations_text.lower():
+                observations_text = f"{observations_text} | {compra_tag}"
+
         completed = CompletedTask(
             original_task_id=pedido.id,
             title=f"Pedido #{pedido.id} - {pedido.obra or 'Obra sem nome'}",
-            description=f"Obra: {pedido.obra or '-'} | Itens: {itens_count} | Data necessidade: {data_necessidade}",
-            observations=pedido.observacoes,
+            description=description_text,
+            observations=observations_text,
             priority=prioridade,
             assignee=pedido.responsavel,
             due_date=pedido.data_necessidade,
@@ -2399,6 +2460,11 @@ def concluir_pedido_compra(pedido_id):
                 file_size=_att_field(att, 'file_size')
             )
             db.session.add(completed_attachment)
+
+        # Evita falha de FK (compra_workflows.pedido_id -> pedidos_compra.id)
+        # antes de remover o pedido do Kanban.
+        for wf in linked_workflows:
+            wf.pedido_id = None
 
         db.session.delete(pedido)
         db.session.commit()
